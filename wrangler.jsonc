@@ -1,0 +1,12 @@
+// Cloudflare Workers config: serve the static files in ./public, plus one
+// small API route (/api/antibodies) handled by src/worker.js.
+{
+  "name": "panel-design-tools",
+  "compatibility_date": "2026-11-01",
+  "main": "src/worker.js",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}

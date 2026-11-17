@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AbScout — Suyog Pathare</title>
+  <meta name="description" content="Search public antibody catalogs by target, gene, clone or catalog number.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .ab-head { padding-top: 64px; padding-bottom: 28px; }
+    .ab-head h1 { font-size: clamp(36px, 6vw, 56px); }
+    .ab-head p { color: var(--muted); margin: 14px 0 0; max-width: 40em; }
+    .search { display: flex; gap: 10px; margin-top: 28px; }
+    .search input {
+      flex: 1; min-width: 0; font: inherit; font-size: 19px; color: var(--text);
+      background: var(--band); border: 1px solid transparent; border-radius: 14px; padding: 12px 18px;
+    }
+    .search input:focus { outline: none; border-color: var(--pill); background: var(--bg); }
+    .search button { border: 0; cursor: pointer; font: inherit; }
+    .examples { color: var(--muted); font-size: 14px; margin-top: 12px; }
+    .examples button { border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+    .examples button:hover { text-decoration: underline; }
+
+    .ab-body { padding-top: 8px; padding-bottom: 96px; }
+    .status { color: var(--muted); font-size: 15px; min-height: 22px; margin: 0 0 16px; }
+    .status.err { color: #d70015; }
+    .progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: -6px 0 18px; }
+    .progress[hidden] { display: none; }
+    .progress .bar { height: 100%; width: 0; background: var(--link); border-radius: 2px; transition: width .3s ease; }
+    .progress.busy .bar { width: 30%; animation: slide 1.2s ease-in-out infinite; }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+    @media (prefers-reduced-motion: reduce) { .progress.busy .bar { animation: none; width: 100%; opacity: .4; } }
+    .progress-note { color: var(--muted); font-size: 13px; margin: -12px 0 16px; }
+    .progress-note[hidden] { display: none; }
+
+    .gene { background: var(--band); border-radius: 18px; padding: 22px 26px; margin-bottom: 24px; }
+    .gene h2 { font-size: 24px; margin: 0; }
+    .gene .syn { color: var(--muted); font-size: 15px; margin: 4px 0 0; }
+    .gene dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 16px 0 0; font-size: 15px; }
+    .gene dt { color: var(--muted); }
+    .tissues { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; margin-top: 18px; font-size: 14px; }
+    .tissues h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
+    .trow { display: grid; grid-template-columns: 9.5em 1fr 4.5em; align-items: center; gap: 8px; margin: 3px 0; }
+    .tbar { height: 6px; border-radius: 3px; background: var(--pill); opacity: .75; min-width: 2px; }
+    .tval { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    @media (max-width: 734px) { .tissues { grid-template-columns: 1fr; } }
+    .gene dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .gene .link-chevron { font-size: 15px; white-space: normal; }
+
+    .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; font-size: 14px; }
+    .filters select { max-width: 100%; }
+    #f-more { width: 220px; }
+    .filters select, .filters input[type=text] {
+      font: inherit; color: var(--text); background: var(--band); border: 1px solid var(--line);
+      border-radius: 10px; padding: 7px 10px;
+    }
+    .filters label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+    .filters .spacer { flex: 1; }
+    .linkbtn { border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+    .linkbtn:hover { text-decoration: underline; }
+
+    .tablewrap { overflow-x: auto; border-top: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+    th button { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+    th button[aria-sort]::after { content: " ↓"; }
+    th button[aria-sort=ascending]::after { content: " ↑"; }
+    td.num { text-align: right; padding-right: 20px; }
+    th.num { text-align: right; padding-right: 20px; }
+    .sub { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+    .tag { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; margin-left: 4px; }
+    .more { margin-top: 18px; }
+    .viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 14px; }
+    .seg { display: inline-flex; background: var(--band); border-radius: 10px; padding: 3px; }
+    .seg button { border: 0; background: none; font: inherit; font-size: 14px; color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+    .seg button[aria-pressed=true] { background: var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+    .chip[hidden] { display: none; }
+    .chip { font-size: 14px; background: var(--band); border-radius: 980px; padding: 5px 8px 5px 14px; display: inline-flex; gap: 8px; align-items: center; }
+    .chip button { border: 0; background: var(--line); color: var(--text); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; }
+    .clonebtn { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--link); cursor: pointer; text-align: left; }
+    .clonebtn:hover { text-decoration: underline; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .tag.omap { color: var(--pill); border-color: color-mix(in srgb, var(--pill) 45%, transparent); cursor: help; }
+    .omaplist { margin: 16px 0 0; font-size: 14px; }
+    .omaplist h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
+    .omaplist li { margin: 3px 0; }
+    .omaplist ul { margin: 0; padding-left: 18px; }
+    .addbtn { border: 1px solid var(--line); background: var(--bg); color: var(--link); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1; padding: 0; }
+    .addbtn[aria-pressed=true] { background: var(--pill); border-color: var(--pill); color: #fff; }
+    .panel { border: 1px solid var(--line); border-radius: 18px; padding: 18px 22px; margin-bottom: 24px; }
+    .panel[hidden] { display: none; }
+    .panel summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+    .panel .flags { margin: 14px 0 0; padding-left: 18px; font-size: 14px; }
+    .panel .flags li { margin: 4px 0; }
+    .panel .actions { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 14px; }
+    .panel table { margin-top: 12px; }
+    .note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+    .pb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 14px; font-size: 14px; }
+    .pb-row label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--muted); }
+    .pb-row select, .pb-row input[type=text], .pb-add textarea {
+      font: inherit; color: var(--text); background: var(--band); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; max-width: 100%;
+    }
+    .pb-row button.pill { border: 0; cursor: pointer; font: inherit; font-size: 14px; }
+    .pb-add { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .pb-add > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+    .pb-add textarea { display: block; width: 100%; box-sizing: border-box; min-height: 70px; margin-top: 10px; resize: vertical; }
+    .pb-sug td, .pb-plan td { font-size: 13px; }
+    .pb-sug select { font: inherit; font-size: 13px; max-width: 260px; color: var(--text); background: var(--band); border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; }
+    .pb-plan h3 { font-size: 15px; margin: 22px 0 4px; }
+    #pb-channels { width: 260px; }
+    .warn { color: #b25000; }
+    @media (prefers-color-scheme: dark) { .warn { color: #ff9f0a; } }
+    .credits { color: var(--muted); font-size: 12px; margin-top: 40px; line-height: 1.6; }
+    .credits.cite { margin-top: 12px; }
+    @media (max-width: 734px) {
+      .ab-head { padding-top: 40px; }
+      .hide-sm { display: none; }
+      td:first-child .sub { display: none; }
+      td:first-child { min-width: 7em; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/">Suyog Pathare</a>
+      <nav aria-label="Sections">
+        <a href="/#tools">Tools</a>
+        <a href="/#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="ab-head">
+      <div class="wrap">
+        <h1>AbScout</h1>
+        <p>Search public antibody catalogs by target, gene, clone or catalog number. A protein name such as CD45 also searches its gene symbol (PTPRC).</p>
+        <form class="search" role="search" id="form">
+          <input id="q" name="q" type="search" placeholder="CD45, PTPRC, HI30, 13917 …" autocomplete="off" spellcheck="false" aria-label="Search antibodies">
+          <button class="pill" type="submit">Search</button>
+        </form>
+        <p class="examples">Try
+          <button type="button" data-q="CD45">CD45</button>,
+          <button type="button" data-q="Ki-67">Ki-67</button>,
+          <button type="button" data-q="pan-cytokeratin">pan-cytokeratin</button>,
+          <button type="button" data-q="D9M8I">D9M8I</button>
+        </p>
+      </div>
+    </section>
+
+    <section class="ab-body">
+      <div class="wrap">
+        <p class="status" id="status" aria-live="polite"></p>
+        <div class="progress" id="progress" hidden role="progressbar" aria-label="Loading results" aria-valuemin="0" aria-valuemax="100"><div class="bar" id="progress-bar"></div></div>
+        <p class="progress-note" id="progress-note" hidden></p>
+        <div id="gene"></div>
+        <details class="panel" id="panel">
+          <summary id="panel-title">Panel builder</summary>
+          <div class="pb-row">
+            <label>Platform
+              <select id="pb-platform">
+                <option value="indirect">Immunofluorescence, primary + secondary antibodies</option>
+                <option value="cyclic">Cyclic immunofluorescence, direct conjugates (e.g. CyCIF)</option>
+                <option value="phenocycler">PhenoCycler (DNA-barcoded antibodies)</option>
+                <option value="metal">Imaging mass cytometry or MIBI (metal-tagged)</option>
+              </select>
+            </label>
+            <label>Tissue species
+              <select id="pb-species"><option>Human</option><option>Mouse</option><option>Rat</option></select>
+            </label>
+          </div>
+          <details class="pb-add" id="pb-add">
+            <summary>Add targets from a list</summary>
+            <p class="note" style="margin-top:8px">One antibody is suggested per target: catalog entries used in a HuBMAP OMAP panel first, then the format that suits the platform, then the most citations. Up to 25 targets.</p>
+            <textarea id="pb-list" spellcheck="false" placeholder="CD3E, CD8A, PD-L1, FOXP3 …"></textarea>
+            <div class="pb-row"><button class="pill" type="button" id="pb-suggest">Suggest antibodies</button><span class="note" id="pb-status" style="margin:0"></span></div>
+            <div id="pb-suggestions"></div>
+          </details>
+          <div id="pb-body">
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Target</th><th>Clone</th><th>Vendor · catalog</th><th>Host</th><th>Conjugate</th><th>RRID</th><th></th></tr></thead>
+              <tbody id="panel-rows"></tbody>
+            </table>
+          </div>
+          <ul class="flags" id="panel-flags"></ul>
+          <div id="pb-plan"></div>
+          <div class="actions">
+            <button class="linkbtn" type="button" id="panel-csv">Download panel CSV</button>
+            <button class="linkbtn" type="button" id="panel-clear">Clear panel</button>
+          </div>
+          </div>
+          <p class="note">Checks list what the catalog records say (host, conjugate, target, status) and what the chosen platform usually needs. They are prompts for review, not a judgement of whether a panel will work. The panel is saved in this browser only.</p>
+        </details>
+
+        <div id="results" hidden>
+          <div class="viewbar">
+            <div class="seg" role="group" aria-label="View">
+              <button type="button" data-view="clones" aria-pressed="true">By clone</button>
+              <button type="button" data-view="products" aria-pressed="false">All products</button>
+            </div>
+            <span class="chip" id="clone-chip" hidden><span id="clone-chip-text"></span><button type="button" id="clone-clear" aria-label="Show all clones">×</button></span>
+          </div>
+          <div class="filters">
+            <select id="f-clonality" aria-label="Clonality"></select>
+            <select id="f-host" aria-label="Host species"></select>
+            <select id="f-react" aria-label="Species reactivity"></select>
+            <select id="f-conj" aria-label="Conjugate">
+              <option value="">Any conjugate</option>
+              <option value="unconj">Unconjugated only</option>
+              <option value="conj">Conjugated only</option>
+            </select>
+            <input id="f-text" type="text" placeholder="Filter vendor, clone, conjugate…" aria-label="Filter results">
+            <label><input id="f-disc" type="checkbox"> Hide discontinued</label>
+            <label title="Antibodies used in HuBMAP Organ Mapping Antibody Panels for multiplexed tissue imaging"><input id="f-omap" type="checkbox"> In OMAP panels</label>
+            <select id="f-more" aria-label="Load every product from one vendor" hidden></select>
+            <span class="spacer"></span>
+            <button class="linkbtn" type="button" id="csv">Download CSV</button>
+          </div>
+          <div id="clones-view">
+            <div class="tablewrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button type="button" data-gsort="clone">Clone</button></th>
+                    <th class="hide-sm">Target</th>
+                    <th><button type="button" data-gsort="n">Products</button></th>
+                    <th class="hide-sm">Host</th>
+                    <th class="hide-sm">Conjugates</th>
+                    <th class="num"><button type="button" data-gsort="citations" aria-sort="descending">Registry citations</button></th>
+                    <th class="num"><button type="button" data-gsort="papers">Papers</button></th>
+                  </tr>
+                </thead>
+                <tbody id="grows"></tbody>
+              </table>
+            </div>
+            <p class="more"><button class="linkbtn" type="button" id="gmore" hidden>Show more</button></p>
+            <p class="note" id="gnote"></p>
+          </div>
+          <div id="products-view" hidden>
+          <div class="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><span class="sr-only">Add</span></th>
+                  <th><button type="button" data-sort="target">Target</button></th>
+                  <th><button type="button" data-sort="vendor">Vendor · catalog</button></th>
+                  <th><button type="button" data-sort="clone">Clone</button></th>
+                  <th class="hide-sm"><button type="button" data-sort="host">Host</button></th>
+                  <th class="hide-sm"><button type="button" data-sort="conjugate">Conjugate</button></th>
+                  <th class="num"><button type="button" data-sort="citations" aria-sort="descending">Citations</button></th>
+                  <th class="hide-sm">RRID</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p class="more"><button class="linkbtn" type="button" id="more" hidden>Show more</button></p>
+          </div>
+        </div>
+
+        <p class="credits">
+          Catalog data: <a href="https://www.antibodyregistry.org">Antibody Registry</a> (RRIDs). Registry citation counts are as recorded by the registry and can be incomplete.
+          Papers: number of articles in <a href="https://europepmc.org">Europe PMC</a> whose text mentions the clone name together with the target; a rough measure of use that can include unrelated mentions of the same name.
+          Gene names, synonyms and HPA antibody reliability: <a href="https://www.proteinatlas.org">Human Protein Atlas</a>, CC BY 4.0
+          (Uhlén M et al., Tissue-based map of the human proteome, <i>Science</i> 2015).
+          OMAP badges: antibodies used in the <a href="https://humanatlas.io/omap">HuBMAP Organ Mapping Antibody Panels</a> for multiplexed tissue imaging (Human Reference Atlas, CC BY 4.0), matched by RRID, or by clone and gene.
+          This page lists what the public sources record; check validation data with the vendor before use.
+        </p>
+        <p class="credits cite"><b>How to cite:</b> Pathare S. AbScout: antibody catalog search for multiplex tissue imaging. Version 1.0, 2026. https://suyogpathare.com/abscout/<span class="doi"></span><br>Scientific design and validation by Suyog Pathare.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© <span id="yr"></span> Suyog Pathare</div>
+  </footer>
+
+  <script>
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const PAGE = 100;
+    const GPAGE = 50;
+    let data = null, shown = PAGE, sortKey = "citations", sortDir = -1;
+    let view = "clones", cloneFilter = null, gShown = GPAGE, gSortKey = "citations", gSortDir = -1;
+    let omap = null, omapByGene = new Map(), omapClones = new Set();
+    const omapReady = fetch("/data/omap.json").then((r) => r.json()).then((j) => {
+      omap = j;
+      for (const [rrid, list] of Object.entries(j.antibodies)) {
+        for (const x of list) {
+          if (!x.gene) continue;
+          if (!omapByGene.has(x.gene)) omapByGene.set(x.gene, []);
+          omapByGene.get(x.gene).push({ ...x, rrid });
+        }
+      }
+    }).catch(() => {});
+    const panelText = (ps) => [...new Set(ps)].map((p) => { const x = omap.panels[p]; return `${x.id} ${x.tissue} (${x.method}${x.preservation ? ", " + x.preservation : ""})`; }).join("; ");
+    const normClone = (c) => cloneKey({ clone: c });
+    function omapPanelsForItem(i) {
+      if (!omap) return [];
+      const ps = (omap.antibodies[i.rrid] || []).map((x) => x.p);
+      if (data.gene && omapClones.has(cloneKey(i))) {
+        for (const x of omapByGene.get(data.gene.symbol) || []) if (normClone(x.clone) === cloneKey(i)) ps.push(x.p);
+      }
+      return [...new Set(ps)];
+    }
+    const omapTag = (ps) => ps.length ? `<span class="tag omap" title="Used in ${esc(panelText(ps))}">OMAP${ps.length > 1 ? " ×" + ps.length : ""}</span>` : "";
+    // Panel: saved per browser; failures (private mode) just mean it is not remembered.
+    const PANEL_KEY = "antibody-panel-v1";
+    let panel = [];
+    try { panel = JSON.parse(localStorage.getItem(PANEL_KEY) || "[]"); } catch { panel = []; }
+    if (!Array.isArray(panel)) panel = [];
+    panel.forEach((x) => { x.conjugate = String(x.conjugate || "").split(";").pop().trim(); });
+    const savePanel = () => { try { localStorage.setItem(PANEL_KEY, JSON.stringify(panel)); } catch {} };
+    const inPanel = (rrid) => panel.some((x) => x.rrid === rrid);
+    // Tissue RNA (HPA nTPM) kept with each entry so the channel plan works offline later.
+    const rnaMap = (g) => g && g.tissue_rna && g.tissue_rna.length ? Object.fromEntries(g.tissue_rna.map((t) => [t.tissue, t.ntpm])) : null;
+    function panelEntry(i, gene) {
+      return { rrid: i.rrid, target: i.target, gene: gene ? gene.symbol : "", clone: i.clone, clonality: i.clonality,
+        vendor: i.vendor, catalog: i.catalog, host: i.host, conjugate: i.conjugate, discontinued: i.discontinued,
+        product_url: i.product_url || null, rna: rnaMap(gene) };
+    }
+    function togglePanel(rrid) {
+      if (inPanel(rrid)) panel = panel.filter((x) => x.rrid !== rrid);
+      else {
+        const i = data.items.find((x) => x.rrid === rrid);
+        if (!i) return;
+        panel.push(panelEntry(i, data.gene));
+      }
+      savePanel(); renderPanel(); render();
+    }
+    const label = (x) => x.gene || short(x.target, 24);
+    const isMetal = (c) => /^\d{2,3}\s*[A-Z][a-z]?$|^[A-Z][a-z]?\s*\d{2,3}$|lanthanide|maxpar|\b(La|Pr|Nd|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu|Pt)\s*1\d\d\b/i.test(c || "");
+    const isBarcode = (c) => /barcode|codex|oligo|\bdna\b|\bbx\d/i.test(c || "");
+    const isFluor = (c) => !isUnconj(c) && !isMetal(c) && !isBarcode(c) && !/biotin|hrp|peroxidase|alkaline|\bap\b|gold|agarose|magnetic|bead|purified|carrier|azide|bsa/i.test(c || "");
+    function panelFlags() {
+      const f = [];
+      const plat = platform();
+      const unconj = panel.filter((x) => isUnconj(x.conjugate));
+      if (plat === "indirect") {
+        const byHost = {};
+        unconj.forEach((x) => { const h = x.host || "Unknown host"; (byHost[h] ||= []).push(x); });
+        for (const [h, xs] of Object.entries(byHost)) {
+          if (xs.length > 1) f.push(`${xs.length} unconjugated ${h.toLowerCase()} primaries (${xs.map(label).join(", ")}): one anti-${h.toLowerCase()} secondary would detect all of them. Options include direct conjugates, isotype-specific secondaries, or sequential staining with blocking. The channel plan below keeps them in separate rounds.`);
+        }
+      }
+      if (plat === "cyclic" && unconj.length) f.push(`Unconjugated: ${unconj.map(label).join(", ")}. Cyclic workflows usually need a direct conjugate, an in-house conjugation, or a secondary in a dedicated cycle.`);
+      if (plat === "phenocycler" || plat === "metal") {
+        const what = plat === "metal" ? "metal" : "DNA barcode";
+        const conj = panel.filter((x) => !isUnconj(x.conjugate) && !(plat === "metal" && isMetal(x.conjugate)) && !(plat === "phenocycler" && isBarcode(x.conjugate)));
+        if (conj.length) f.push(`Already conjugated (${conj.map((x) => `${label(x)}: ${x.conjugate}`).join("; ")}). Custom ${what} conjugation normally starts from an unconjugated antibody; look for the unconjugated version of the same clone.`);
+        if (unconj.length) f.push(`For ${what} conjugation, check that ${unconj.length === 1 ? "this antibody is" : "these antibodies are"} sold carrier-free (no BSA, gelatin or azide), or plan a clean-up step: ${unconj.map(label).join(", ")}. The registry does not record buffer formulation.`);
+      }
+      const poly = panel.filter((x) => /polyclonal/i.test(x.clonality));
+      if (poly.length && plat !== "indirect") f.push(`Polyclonal: ${poly.map(label).join(", ")}. Lot-to-lot variation matters more when an antibody is conjugated and validated once for a long-running panel.`);
+      const byConj = {};
+      panel.filter((x) => !isUnconj(x.conjugate)).forEach((x) => { const c = x.conjugate.trim(); (byConj[c] ||= []).push(x); });
+      for (const [c, xs] of Object.entries(byConj)) {
+        if (xs.length > 1) f.push(plat === "cyclic"
+          ? `${c} is on ${xs.length} antibodies (${xs.map(label).join(", ")}); the channel plan puts them in different cycles.`
+          : `${c} is on ${xs.length} antibodies (${xs.map(label).join(", ")}); they need separating by cycle or channel.`);
+      }
+      const byTarget = {};
+      panel.forEach((x) => { const t = (x.gene || x.target).toUpperCase(); (byTarget[t] ||= []).push(x); });
+      for (const [t, xs] of Object.entries(byTarget)) if (xs.length > 1) f.push(`${t} appears ${xs.length} times (clones: ${xs.map((x) => x.clone || "none listed").join(", ")}).`);
+      panel.filter((x) => x.discontinued).forEach((x) => f.push(`${x.vendor} ${x.catalog} is marked discontinued in the registry.`));
+      const unknownHost = panel.filter((x) => !x.host);
+      if (unknownHost.length) f.push(`Host species not recorded for ${unknownHost.map((x) => `${x.vendor} ${x.catalog}`).join(", ")}; check the datasheet.`);
+      return f;
+    }
+    // Vendor product page when the registry has one; otherwise a web search for
+    // vendor + catalog number, which normally lands on the order page first.
+    function orderUrl(x) {
+      if (x.product_url) return x.product_url;
+      if (!x.catalog) return null;
+      return `https://www.google.com/search?q=${encodeURIComponent(`${x.vendor} "${x.catalog}"`)}`;
+    }
+    function orderLink(x, text) {
+      const u = orderUrl(x);
+      if (!u || !text) return text || "—";
+      const how = x.product_url ? "Open the vendor product page" : `Search for ${x.vendor} ${x.catalog}`;
+      return `<a href="${esc(u)}" target="_blank" rel="noopener" title="${esc(how)}">${text}</a>`;
+    }
+    // Links to other sites open in a new tab so the current search stays put.
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[href]");
+      if (a && a.host && a.host !== location.host) { a.target = "_blank"; a.rel = "noopener"; }
+    });
+    function renderPanel() {
+      $("pb-body").hidden = !panel.length;
+      $("panel-title").textContent = panel.length ? `Panel builder · ${panel.length} antibod${panel.length === 1 ? "y" : "ies"}` : "Panel builder";
+      if (!panel.length) { $("pb-plan").innerHTML = ""; return; }
+      $("panel-rows").innerHTML = panel.map((x) => `<tr>
+          <td>${esc(x.gene || short(x.target, 30))}</td>
+          <td>${orderLink(x, esc(x.clone))}<span class="sub">${esc(x.clonality)}</span></td>
+          <td>${orderLink(x, esc(x.vendor))}<span class="sub">${esc(x.catalog)}</span></td>
+          <td>${esc(x.host) || "—"}</td>
+          <td>${esc(x.conjugate) || "—"}</td>
+          <td><a href="https://www.antibodyregistry.org/${esc(x.rrid)}">${esc(x.rrid)}</a></td>
+          <td><button class="linkbtn" type="button" data-remove="${esc(x.rrid)}">Remove</button></td>
+        </tr>`).join("");
+      const f = panelFlags();
+      $("panel-flags").innerHTML = f.length ? f.map((x) => `<li>${esc(x)}</li>`).join("") : "<li>No host, conjugate or duplicate-target overlaps recorded.</li>";
+      renderPlan();
+    }
+
+    // ---------- Platform, channel plan, suggestions ----------
+    const PB_KEY = "abscout-builder-v1";
+    let pb = { platform: "indirect", species: "Human", channels: "AF647, AF555, AF488, AF750", tissue: "" };
+    try { pb = { ...pb, ...JSON.parse(localStorage.getItem(PB_KEY) || "{}") }; } catch {}
+    if (!["indirect", "cyclic", "phenocycler", "metal"].includes(pb.platform)) pb.platform = "indirect";
+    if (!["Human", "Mouse", "Rat"].includes(pb.species)) pb.species = "Human";
+    if (typeof pb.channels !== "string" || !pb.channels.trim()) pb.channels = "AF647, AF555, AF488, AF750";
+    const savePb = () => { try { localStorage.setItem(PB_KEY, JSON.stringify(pb)); } catch {} };
+    const platform = () => pb.platform;
+    let lastPlan = new Map(); // rrid -> {round, channel}
+
+    async function fillMissingRna() {
+      const need = panel.filter((x) => x.gene && !x.rna && !x.rnaTried && !x.rnaFrom);
+      if (!need.length) return false;
+      await Promise.all(need.map(async (x) => {
+        x.rnaTried = true;
+        try { const r = await fetch(`/api/gene?q=${encodeURIComponent(x.gene)}`); if (r.ok) x.rna = rnaMap((await r.json()).gene); } catch {}
+      }));
+      savePanel();
+      return true;
+    }
+
+    function renderPlan() {
+      const el = $("pb-plan");
+      lastPlan = new Map();
+      const plat = platform();
+      if (plat === "phenocycler" || plat === "metal") {
+        el.innerHTML = `<p class="note">Channel planning here covers fluorescence platforms. For ${plat === "metal" ? "metal-tagged panels, pair low-abundance targets with the isotopes your instrument detects most sensitively" : "PhenoCycler, the reporter for each barcode is chosen per cycle in the instrument software"}.</p>`;
+        return;
+      }
+      fillMissingRna().then((changed) => { if (changed) renderPlan(); });
+      const tissues = [...new Set(panel.flatMap((x) => x.rna ? Object.keys(x.rna) : []))].sort();
+      if (pb.tissue && !tissues.includes(pb.tissue)) pb.tissue = "";
+      const channels = pb.channels.split(/[,;]+/).map((c) => c.trim()).filter(Boolean);
+      const lvl = (x) => (pb.tissue && x.rna && x.rna[pb.tissue] !== undefined ? x.rna[pb.tissue] : null);
+      // Lowest RNA first; entries with no expression value go last.
+      const order = [...panel].sort((a, b) => {
+        const la = lvl(a), lb = lvl(b);
+        if (la === null && lb === null) return 0;
+        if (la === null) return 1;
+        if (lb === null) return -1;
+        return la - lb;
+      });
+      let rows = [], warn = [];
+      if (plat === "indirect" && channels.length) {
+        const rounds = [];
+        for (const x of order) {
+          const host = isUnconj(x.conjugate) ? (x.host || "?") : null;
+          let r = rounds.find((rd) => rd.items.length < channels.length && (!host || !rd.hosts.has(host)));
+          if (!r) { r = { items: [], hosts: new Set() }; rounds.push(r); }
+          r.items.push(x); if (host) r.hosts.add(host);
+        }
+        rounds.forEach((rd, ri) => rd.items.forEach((x, ci) => {
+          const conj = !isUnconj(x.conjugate);
+          rows.push({ x, round: ri + 1, channel: conj ? `${x.conjugate} (direct)` : `anti-${(x.host || "host").toLowerCase()} ${channels[ci]}` });
+          lastPlan.set(x.rrid, { round: ri + 1, channel: conj ? x.conjugate : channels[ci] });
+          if (conj) warn.push(`${label(x)} is directly conjugated (${x.conjugate}); check that this does not clash with ${channels[ci]} in round ${ri + 1}.`);
+        }));
+      } else if (plat === "cyclic") {
+        const cycles = [];
+        for (const x of order) {
+          const c = isUnconj(x.conjugate) ? "unconjugated" : x.conjugate.trim();
+          let cy = cycles.find((k) => !k.has(c) && k.size < Math.max(channels.length, 1));
+          if (!cy) { cy = new Set(); cycles.push(cy); }
+          cy.add(c);
+          rows.push({ x, round: cycles.indexOf(cy) + 1, channel: c });
+          lastPlan.set(x.rrid, { round: cycles.indexOf(cy) + 1, channel: c });
+        }
+        if (pb.tissue) {
+          const norm = (v) => v.toLowerCase().replace(/alexa\s*fluor|alexa/g, "af").replace(/[^a-z0-9]/g, "");
+          const rank = (c) => { const i = channels.findIndex((ch) => norm(c).includes(norm(ch))); return i < 0 ? null : i; };
+          const known = order.filter((x) => lvl(x) !== null && isFluor(x.conjugate) && rank(x.conjugate) !== null);
+          const half = Math.ceil(known.length / 2);
+          known.slice(0, half).forEach((x) => {
+            const r = rank(x.conjugate);
+            if (channels.length > 1 && r >= Math.ceil(channels.length / 2)) warn.push(`${label(x)} has among the lowest RNA in ${pb.tissue} but is on ${x.conjugate}, one of your dimmer channels; a brighter conjugate of the same clone may help.`);
+          });
+        }
+      }
+      const tOpts = tissues.map((t) => `<option value="${esc(t)}"${t === pb.tissue ? " selected" : ""}>${esc(t)}</option>`).join("");
+      el.innerHTML = `<div class="pb-plan">
+        <h3>${plat === "cyclic" ? "Cycle plan" : "Channel plan"}</h3>
+        <p class="note" style="margin-top:0">${plat === "cyclic"
+          ? "Antibodies are grouped so no two in one cycle share a fluorophore, lowest-expressed targets first. Pick a tissue to check that low-expressed targets sit on bright channels."
+          : "Targets with the lowest RNA in the chosen tissue get the brightest channels; unconjugated primaries that share a host species go in different rounds."}</p>
+        <div class="pb-row" style="margin-top:6px">
+          <label>Tissue <select id="pb-tissue"><option value="">Choose a tissue</option>${tOpts}</select></label>
+          <label>Channels, brightest first <input type="text" id="pb-channels" value="${esc(pb.channels)}" spellcheck="false"></label>
+        </div>
+        <p class="note" style="margin-top:6px">The channel order is an example; edit it to match your microscope, filters and dyes.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>${plat === "cyclic" ? "Cycle" : "Round"}</th><th>Channel</th><th>Target</th><th class="num">RNA in ${esc(pb.tissue || "tissue")} (nTPM)</th></tr></thead>
+          <tbody>${rows.sort((a, b) => a.round - b.round).map((r) => `<tr><td>${r.round}</td><td>${esc(r.channel)}</td><td>${esc(label(r.x))}</td><td class="num">${lvl(r.x) === null ? "—" : lvl(r.x).toLocaleString(undefined, { maximumFractionDigits: 1 })}${r.x.rnaFrom ? `<span class="sub">from ${esc(r.x.rnaFrom)}</span>` : ""}</td></tr>`).join("")}</tbody>
+        </table></div>
+        ${warn.length ? `<ul class="flags">${warn.map((w) => `<li class="warn">${esc(w)}</li>`).join("")}</ul>` : ""}
+        <p class="note">Expression is normal-tissue RNA from the Human Protein Atlas consensus data. RNA is a rough guide to protein abundance and says nothing about disease tissue; titrate each antibody before fixing the plan.</p>
+      </div>`;
+    }
+
+    // Suggest one catalog entry per target.
+    // Dyes made for tissue imaging vs. ones designed for flow cytometry (tandems, Brilliant Violet/UV, PE, APC, PerCP).
+    const FLOW_DYE = /\b(pe|apc|percp|bv\d|buv\d|bb\d|spark|pacific|super\s*bright|cyanine|cy[57]\b|pe[-_ ]?cy|apc[-_ ]?cy|fire|vio)/i;
+    const IMAGING_DYE = /alexa|\baf\s?\d{3}|efluor|\bcf\s?\d{3}|atto|dylight|ifluor|janelia|\bcy[35]\b|fitc|opal|rhodamine|texas red/i;
+    function fit(i, plat) {
+      const c = i.conjugate;
+      if (plat === "cyclic") return isFluor(c) ? (IMAGING_DYE.test(c) && !/pe[-_ ]|apc[-_ ]|tandem/i.test(c) ? 3 : FLOW_DYE.test(c) ? 0.5 : 2) : isUnconj(c) ? 1 : 0;
+      if (plat === "metal") return isUnconj(c) ? 2 : isMetal(c) ? 2 : 0;
+      if (plat === "phenocycler") return isBarcode(c) ? 3 : isUnconj(c) ? 2 : 0;
+      return isUnconj(c) ? 2 : plat === "indirect" && isFluor(c) ? 1 : 0;
+    }
+    const KIT = /\bkit\b|morpholog|\bpanel\b|bundle|starter|sampler|isotype control/i;
+    function reactFit(i, sp) {
+      const r = (i.reactivity || []).map((x) => x.toLowerCase());
+      if (!r.length) return 1; // not recorded
+      return r.some((x) => x.includes(sp.toLowerCase())) ? 2 : 0;
+    }
+    function rankCandidates(items, gene, plat) {
+      const sp = pb.species || "Human";
+      const omapC = new Set(gene ? (omapByGene.get(gene.symbol) || []).map((x) => normClone(x.clone)).filter(Boolean) : []);
+      const omapUse = (i) => (omap && omap.antibodies[i.rrid]) || (cloneKey(i) && omapC.has(cloneKey(i))) ? 1 : 0;
+      const mono = (i) => (/monoclonal|recombinant/i.test(i.clonality) ? 1 : 0);
+      return items.filter((i) => !i.discontinued && fit(i, plat) > 0 && reactFit(i, sp) > 0 && !KIT.test(`${i.name} ${i.target}`))
+        .map((i) => ({ i, omap: sp === "Human" ? omapUse(i) : 0, react: reactFit(i, sp), fit: fit(i, plat), mono: mono(i) }))
+        .sort((a, b) => b.fit - a.fit || b.omap - a.omap || (b.i.citations * b.react) - (a.i.citations * a.react) || b.mono - a.mono);
+    }
+    function why(c, plat) {
+      const bits = [];
+      if (c.omap) bits.push("used in a HuBMAP OMAP panel");
+      bits.push(c.react === 2 ? `${pb.species} reactivity recorded` : "reactivity not recorded; check the datasheet");
+      bits.push(`${c.i.citations.toLocaleString()} registry citation${c.i.citations === 1 ? "" : "s"}`);
+      bits.push(isUnconj(c.i.conjugate) ? "unconjugated" : c.i.conjugate);
+      if (FLOW_DYE.test(c.i.conjugate || "") && !IMAGING_DYE.test(c.i.conjugate || "")) bits.push("dye designed for flow cytometry; check it survives your imaging and bleaching steps");
+      if (c.i.clonality) bits.push(c.i.clonality);
+      return bits.join(" · ");
+    }
+    let suggestions = [];
+    async function suggest() {
+      const raw = $("pb-list").value.replace(/[\u2010-\u2015\u2212]/g, "-");
+      const targets = [...new Set(raw.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean))].slice(0, 25);
+      const QUERY = { PANCK: "pan-cytokeratin", "PAN-CK": "pan-cytokeratin", PANCYTOKERATIN: "pan-cytokeratin", ASMA: "ACTA2", SMA: "ACTA2", ECAD: "CDH1", "E-CADHERIN": "CDH1", PD1: "PDCD1", "PD-1": "PDCD1", CD3: "CD3", CD3E: "CD3" };
+      // Gene record to use for expression when the search term is not itself a gene symbol.
+      const GENE_FOR = { CD3: "CD3E", PANCK: "KRT8", "PAN-CK": "KRT8", PANCYTOKERATIN: "KRT8" };
+      if (!targets.length) { $("pb-status").textContent = "Enter at least one target."; return; }
+      const plat = platform();
+      await omapReady;
+      suggestions = targets.map((t) => ({ t, state: "loading" }));
+      drawSuggestions();
+      let done = 0;
+      const hostsUsed = new Set(panel.filter((x) => isUnconj(x.conjugate)).map((x) => x.host));
+      const fluorsUsed = new Set(panel.filter((x) => isFluor(x.conjugate)).map((x) => x.conjugate));
+      await pool(suggestions, 2, async (sg) => {
+        try {
+          const r = await fetch(`/api/antibodies?q=${encodeURIComponent(QUERY[sg.t.toUpperCase()] || sg.t)}&species=${encodeURIComponent(pb.species || "Human")}`);
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "failed");
+          sg.gene = j.gene;
+          const gf = GENE_FOR[sg.t.toUpperCase()] || (j.gene ? null : sg.t);
+          if (!sg.gene && gf) {
+            try { const g = await fetch(`/api/gene?q=${encodeURIComponent(gf)}`); if (g.ok) sg.gene = (await g.json()).gene; } catch {}
+            if (sg.gene && GENE_FOR[sg.t.toUpperCase()]) sg.proxy = true; // expression borrowed from a representative gene
+          }
+          sg.cands = rankCandidates(j.items || [], sg.gene, plat).slice(0, 8);
+          sg.pick = 0;
+          // Indirect IF: prefer a different host species when a close alternative exists.
+          if (plat === "indirect" && sg.cands.length > 1) {
+            const top = sg.cands[0];
+            const alt = sg.cands.findIndex((c) => isUnconj(c.i.conjugate) && !hostsUsed.has(c.i.host) && c.omap >= top.omap && c.i.citations >= top.i.citations * 0.25);
+            if (alt > 0 && hostsUsed.has(top.i.host)) { sg.pick = alt; sg.note = `chosen over the most cited (${top.i.host}) to avoid a shared host species`; }
+          }
+          // Cyclic IF: prefer a fluorophore not already used when a comparable option exists.
+          if (plat === "cyclic" && sg.cands.length > 1) {
+            const top = sg.cands[0];
+            if (fluorsUsed.has(top.i.conjugate)) {
+              const alt = sg.cands.findIndex((c) => c.fit === top.fit && c.omap >= top.omap && !fluorsUsed.has(c.i.conjugate) && c.i.citations >= top.i.citations * 0.25);
+              if (alt > 0) { sg.pick = alt; sg.note = `chosen over ${top.i.conjugate}, which another target already uses`; }
+            }
+          }
+          const chosen = sg.cands[sg.pick];
+          if (chosen && isUnconj(chosen.i.conjugate)) hostsUsed.add(chosen.i.host);
+          if (chosen && isFluor(chosen.i.conjugate)) fluorsUsed.add(chosen.i.conjugate);
+          sg.state = sg.cands.length ? "ok" : "none";
+        } catch { sg.state = "error"; }
+        done++;
+        $("pb-status").textContent = `Searching the registry: ${done} of ${suggestions.length}`;
+        drawSuggestions();
+      });
+      $("pb-status").textContent = `${suggestions.filter((s) => s.state === "ok").length} of ${suggestions.length} targets have a suggestion.`;
+    }
+    async function pool(list, n, fn) {
+      let k = 0;
+      await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => { while (k < list.length) await fn(list[k++]); }));
+    }
+    function drawSuggestions() {
+      const plat = platform();
+      const ok = suggestions.filter((s) => s.state === "ok");
+      $("pb-suggestions").innerHTML = !suggestions.length ? "" : `<div class="tablewrap"><table class="pb-sug">
+        <thead><tr><th>Target</th><th>Suggested antibody</th><th>Why</th><th></th></tr></thead>
+        <tbody>${suggestions.map((sg, k) => {
+          if (sg.state === "loading") return `<tr><td>${esc(sg.t)}</td><td colspan="3" class="sub">Searching…</td></tr>`;
+          if (sg.state === "error") return `<tr><td>${esc(sg.t)}</td><td colspan="3" class="sub">The registry did not answer; try again.</td></tr>`;
+          if (sg.state === "none") return `<tr><td>${esc(sg.t)}</td><td colspan="3" class="sub">No current catalog entry in a suitable format${plat === "cyclic" ? " (fluorophore-conjugated or unconjugated)" : ""}.</td></tr>`;
+          const c = sg.cands[sg.pick];
+          const added = inPanel(c.i.rrid);
+          const opts = sg.cands.map((x, n) => `<option value="${n}"${n === sg.pick ? " selected" : ""}>${esc(`${x.i.clone || "no clone"} · ${x.i.vendor} ${x.i.catalog}`)}</option>`).join("");
+          return `<tr>
+            <td>${esc(sg.gene ? sg.gene.symbol : sg.t)}${sg.gene && sg.gene.symbol.toUpperCase() !== sg.t.toUpperCase() ? `<span class="sub">${esc(sg.t)}</span>` : ""}</td>
+            <td><select data-sg="${k}" aria-label="Antibody for ${esc(sg.t)}">${opts}</select><span class="sub">${esc(c.i.host || "host not recorded")} · ${orderLink(c.i, "order page")} · <a href="?q=${encodeURIComponent(sg.gene ? sg.gene.symbol : sg.t)}">all options</a></span></td>
+            <td>${esc(why(c, plat))}${sg.note && sg.pick === sg.cands.findIndex((x) => x === c) ? `<span class="sub">${esc(sg.note)}</span>` : ""}</td>
+            <td><button class="linkbtn" type="button" data-sgadd="${k}">${added ? "Added" : "Add"}</button></td>
+          </tr>`;
+        }).join("")}</tbody></table></div>
+        ${ok.length > 1 ? `<div class="pb-row"><button class="linkbtn" type="button" id="pb-addall">Add all ${ok.length} to the panel</button></div>` : ""}`;
+    }
+    function addSuggestion(k) {
+      const sg = suggestions[k];
+      if (!sg || sg.state !== "ok") return;
+      const c = sg.cands[sg.pick];
+      if (inPanel(c.i.rrid)) return;
+      const e = panelEntry(c.i, sg.gene);
+      if (sg.proxy) { e.rnaFrom = e.gene; e.gene = sg.t; }
+      panel.push(e);
+    }
+    function panelCsv() {
+      const cols = ["gene", "target", "clone", "clonality", "vendor", "catalog", "host", "conjugate", "rrid", "discontinued", "round", "channel"];
+      const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const lines = [`# platform: ${platform()}${pb.tissue ? `; tissue for channel plan: ${pb.tissue}` : ""}`, cols.join(",")]
+        .concat(panel.map((x) => { const pl = lastPlan.get(x.rrid) || {}; return cols.map((c) => q(c === "round" ? pl.round : c === "channel" ? pl.channel : x[c])).join(","); }));
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+      a.download = "antibody-panel.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    const papers = new Map(); // "CLONE|targets" -> {count, url} | "loading" | null
+
+    $("yr").textContent = new Date().getFullYear();
+
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const short = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
+    const isUnconj = (c) => !c || /^unconjugated$/i.test(c.trim()) || /^none$/i.test(c.trim());
+
+    const NO_CLONE = new Set(["", "N/A", "NA", "NONE", "UNKNOWN", "POLYCLONAL", "MONOCLONAL", "-", "—"]);
+    const cloneKey = (i) => {
+      let c = i.clone || "";
+      const m = c.match(/\(\s*clone\s+([^)\s]+)\s*\)/i); // e.g. "(clone HI30)-175Lu"
+      if (m) c = m[1];
+      const k = c.toUpperCase().replace(/^CLONE\s*/, "").replace(/\s+/g, "");
+      return NO_CLONE.has(k) ? "" : k;
+    };
+    const TOKEN = /^[A-Za-z0-9][A-Za-z0-9./ -]{0,24}$/;
+    // Purely numeric clone names ("104", "13/2.3") match unrelated numbers in papers, so skip them.
+    const searchable = (k) => TOKEN.test(k) && /[A-Za-z]/.test(k) && k.replace(/[^A-Za-z0-9]/g, "").length >= 3;
+    const mode = (arr) => {
+      const c = {};
+      arr.forEach((v) => { if (v) c[v] = (c[v] || 0) + 1; });
+      return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([v]) => v);
+    };
+
+    function setStatus(msg, err) {
+      $("status").textContent = msg;
+      $("status").className = "status" + (err ? " err" : "");
+    }
+
+    // Progress bar: busy (no fraction known) or done/total.
+    function progress(done, total, note) {
+      const el = $("progress");
+      if (done === null) { el.hidden = false; el.classList.add("busy"); el.removeAttribute("aria-valuenow"); $("progress-bar").style.width = ""; }
+      else if (done >= total) { el.hidden = true; el.classList.remove("busy"); }
+      else {
+        el.hidden = false; el.classList.remove("busy");
+        const pct = Math.round((done / total) * 100);
+        el.setAttribute("aria-valuenow", pct);
+        $("progress-bar").style.width = pct + "%";
+      }
+      $("progress-note").hidden = !note;
+      $("progress-note").textContent = note || "";
+    }
+
+    // Remaining slices of a big search, four at a time, merged as they arrive.
+    let searchId = 0;
+    async function loadMore(id) {
+      const jobs = (data.more || []).slice();
+      const total = jobs.length;
+      if (!total) { progress(1, 1); return; }
+      let done = 0, failed = 0, dirty = false;
+      const tick = () => progress(done, total, `Loading more products from the registry: ${done} of ${total} batches${failed ? ` (${failed} timed out)` : ""}`);
+      tick();
+      const flush = setInterval(() => { if (dirty && id === searchId) { dirty = false; buildFilters(); render(); } }, 800);
+      const one = async (job) => {
+        const qs = `q=${encodeURIComponent(data.query)}` + (job.page ? `&page=${job.page}` : `&vendor=${encodeURIComponent(job.vendor)}`);
+        try {
+          const r = await fetch(`/api/antibodies/chunk?${qs}`);
+          const body = await r.json();
+          if (!r.ok) throw new Error(body.error);
+          if (id !== searchId) return;
+          const have = new Set(data.items.map((i) => i.rrid));
+          const add = body.items.filter((i) => !have.has(i.rrid));
+          add.forEach((i) => { i.omap = omapPanelsForItem(i); });
+          if (add.length) { data.items = data.items.concat(add).sort((a, b) => b.citations - a.citations); dirty = true; }
+        } catch {
+          failed++;
+        }
+        if (id !== searchId) return;
+        done++;
+        tick();
+      };
+      const queue = jobs.slice();
+      await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length && id === searchId) await one(queue.shift()); }));
+      clearInterval(flush);
+      if (id !== searchId) return;
+      if (failed) data.partial = true;
+      progress(1, 1);
+      buildFilters();
+      render();
+    }
+
+    async function run(q, push = true) {
+      q = q.trim();
+      if (!q) return;
+      $("q").value = q;
+      if (push) history.pushState(null, "", "?q=" + encodeURIComponent(q));
+      const id = ++searchId;
+      setStatus("Searching the registry…");
+      progress(null, 0, "");
+      $("results").hidden = true;
+      $("gene").innerHTML = "";
+      let body;
+      try {
+        const r = await fetch("/api/antibodies?q=" + encodeURIComponent(q));
+        body = await r.json();
+        if (!r.ok) throw new Error(body.error || "Search failed");
+      } catch (e) {
+        if (id !== searchId) return;
+        progress(1, 1);
+        setStatus(e.message || "Search failed. Try again.", true);
+        return;
+      }
+      if (id !== searchId) return;
+      data = body;
+      await omapReady;
+      omapClones = new Set(data.gene && omap ? (omapByGene.get(data.gene.symbol) || []).map((x) => normClone(x.clone)).filter(Boolean) : []);
+      data.items.forEach((i) => { i.omap = omapPanelsForItem(i); });
+      renderGene();
+      buildFilters();
+      shown = PAGE; gShown = GPAGE; cloneFilter = null;
+      loadedVendors.clear();
+      $("f-text").value = "";
+      setView(data.items.some((i) => cloneKey(i)) ? "clones" : "products");
+      loadMore(id);
+    }
+
+    function setView(v) {
+      view = v;
+      document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
+      render();
+    }
+
+    function renderGene() {
+      const g = data.gene;
+      if (!g) { $("gene").innerHTML = ""; return; }
+      const abs = g.hpa_antibodies.length ? g.hpa_antibodies.join(", ") : "none listed";
+      $("gene").innerHTML = `
+        <div class="gene">
+          <h2>${esc(g.symbol)}</h2>
+          ${g.synonyms.length ? `<p class="syn">Also known as ${esc(g.synonyms.join(", "))}</p>` : ""}
+          <dl>
+            ${g.uniprot.length ? `<dt>UniProt</dt><dd>${g.uniprot.map((u) => `<a href="https://www.uniprot.org/uniprotkb/${esc(u)}">${esc(u)}</a>`).join(", ")}</dd>` : ""}
+            <dt>HPA antibodies</dt><dd>${esc(abs)}</dd>
+            ${g.hpa_ihc_reliability ? `<dt>HPA IHC reliability</dt><dd>${esc(g.hpa_ihc_reliability)}</dd>` : ""}
+            ${g.hpa_url ? `<dt>Protein Atlas</dt><dd><a class="link-chevron" href="${esc(g.hpa_url)}/antibody">Staining and validation</a></dd>` : ""}
+            <dt>RNA panels</dt><dd><a class="link-chevron" href="/panelscout/#human:${encodeURIComponent(g.symbol)}">Xenium and CosMx coverage in PanelScout</a></dd>
+          </dl>
+          ${omapBlock(g)}
+          ${tissueBlock(g)}
+        </div>`;
+    }
+
+    function omapBlock(g) {
+      const list = (omap && omapByGene.get(g.symbol)) || [];
+      if (!list.length) return "";
+      const byClone = new Map();
+      for (const x of list) {
+        const k = normClone(x.clone) || `(no clone) ${x.rrid}`;
+        if (!byClone.has(k)) byClone.set(k, { clone: x.clone || "no clone listed", rrids: new Set(), ps: [] });
+        byClone.get(k).rrids.add(x.rrid);
+        byClone.get(k).ps.push(x.p);
+      }
+      const rows = [...byClone.entries()].sort((a, b) => new Set(b[1].ps).size - new Set(a[1].ps).size).map(([k, v]) => {
+        const inResults = data.items.some((i) => cloneKey(i) === k);
+        const name = inResults ? `<button class="clonebtn" type="button" data-clone="${esc(k)}">${esc(v.clone)}</button>` : esc(v.clone);
+        const counts = {};
+        [...new Set(v.ps)].forEach((p) => { const t = `${omap.panels[p].tissue} (${omap.panels[p].method})`; counts[t] = (counts[t] || 0) + 1; });
+        const tissues = Object.entries(counts).map(([t, n]) => (n > 1 ? `${t} ×${n}` : t));
+        return `<li>${name} <span class="muted">· ${new Set(v.ps).size} panel${new Set(v.ps).size > 1 ? "s" : ""}: ${esc(tissues.join(", "))} · ${[...v.rrids].map(esc).join(", ")}</span></li>`;
+      });
+      return `<div class="omaplist"><h3>Used in multiplex imaging panels (HuBMAP OMAP)</h3><ul>${rows.join("")}</ul></div>`;
+    }
+
+    function tissueBlock(g) {
+      const t = g.tissue_rna || [];
+      if (t.length < 10) return "";
+      const max = t[0].ntpm || 1;
+      const row = (x) => `<div class="trow"><span>${esc(x.tissue)}</span><span class="tbar" style="width:${Math.max(1, (100 * x.ntpm) / max).toFixed(1)}%"></span><span class="tval">${x.ntpm.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span></div>`;
+      const link = g.hpa_url ? ` · <a href="${esc(g.hpa_url)}/tissue">HPA tissue data</a>` : "";
+      return `<div class="tissues">
+          <div><h3>Highest RNA (nTPM): candidate positive-control tissues</h3>${t.slice(0, 6).map(row).join("")}</div>
+          <div><h3>Lowest RNA (nTPM): candidate negative-control tissues</h3>${t.slice(-6).reverse().map(row).join("")}</div>
+        </div>
+        <p class="note">Normal-tissue RNA consensus from the Human Protein Atlas${g.rna_tissue_specificity ? ` (${esc(g.rna_tissue_specificity.toLowerCase())})` : ""}. RNA level is a guide only; confirm protein expression in the tissue before relying on it as a control${link}.</p>`;
+    }
+
+    function options(sel, label, values) {
+      const cur = sel.value;
+      const counts = {};
+      values.forEach((v) => { if (v) counts[v] = (counts[v] || 0) + 1; });
+      const opts = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      sel.innerHTML = `<option value="">${label}</option>` + opts.map(([v, n]) => `<option value="${esc(v)}">${esc(v)} (${n})</option>`).join("");
+      sel.value = counts[cur] ? cur : "";
+    }
+
+    function buildFilters() {
+      const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
+      options($("f-clonality"), "Any clonality", data.items.map((i) => cap(i.clonality)));
+      options($("f-host"), "Any host", data.items.map((i) => i.host));
+      options($("f-react"), "Any reactivity", data.items.flatMap((i) => i.reactivity));
+      const t = data.target;
+      const more = $("f-more");
+      more.hidden = !(t && t.total > data.items.length);
+      if (!more.hidden) {
+        const vendors = [...new Set(data.items.map((i) => i.vendor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        more.innerHTML = `<option value="">Load all from vendor…</option>` +
+          vendors.map((v) => `<option value="${esc(v)}"${loadedVendors.has(v) ? " disabled" : ""}>${esc(v)}${loadedVendors.has(v) ? " (loaded)" : ""}</option>`).join("");
+      }
+    }
+
+    // Every registry entry for this target from one vendor, merged into results.
+    const loadedVendors = new Set();
+    async function loadVendor(v) {
+      if (!v || !data) return;
+      const q = data.query;
+      setStatus(`Loading all ${v} products…`);
+      progress(null, 0, "");
+      try {
+        const r = await fetch(`/api/antibodies?q=${encodeURIComponent(q)}&vendor=${encodeURIComponent(v)}`);
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || "Search failed");
+        if (!data || data.query !== q) return;
+        const have = new Set(data.items.map((i) => i.rrid));
+        const add = body.items.filter((i) => !have.has(i.rrid));
+        add.forEach((i) => { i.omap = omapPanelsForItem(i); });
+        data.items = data.items.concat(add).sort((a, b) => b.citations - a.citations);
+        loadedVendors.add(v);
+        buildFilters();
+        $("f-text").value = v;
+        shown = PAGE; gShown = GPAGE;
+        progress(1, 1);
+        render();
+      } catch (e) {
+        progress(1, 1);
+        setStatus(e.message || "Could not load that vendor. Try again.", true);
+      }
+    }
+
+    function filtered() {
+      const cl = $("f-clonality").value.toLowerCase();
+      const host = $("f-host").value;
+      const react = $("f-react").value;
+      const conj = $("f-conj").value;
+      const text = $("f-text").value.trim().toLowerCase();
+      const hideDisc = $("f-disc").checked;
+      const onlyOmap = $("f-omap").checked;
+      let rows = data.items.filter((i) =>
+        (!cl || i.clonality === cl) &&
+        (!host || i.host === host) &&
+        (!react || i.reactivity.includes(react)) &&
+        (!conj || (conj === "unconj" ? isUnconj(i.conjugate) : !isUnconj(i.conjugate))) &&
+        (!hideDisc || !i.discontinued) &&
+        (!cloneFilter || cloneKey(i) === cloneFilter) &&
+        (!onlyOmap || i.omap.length) &&
+        (!text || [i.vendor, i.catalog, i.clone, i.conjugate, i.target, i.name].join(" ").toLowerCase().includes(text))
+      );
+      rows.sort((a, b) => {
+        const x = a[sortKey], y = b[sortKey];
+        if (typeof x === "number") return (x - y) * sortDir || b.citations - a.citations;
+        return String(x).localeCompare(String(y)) * sortDir || b.citations - a.citations;
+      });
+      return rows;
+    }
+
+    function render() {
+      if (!data) return;
+      const rows = filtered();
+      const t = data.target;
+      const totalNote = !$("progress").hidden ? ""
+        : t && t.total > data.items.length
+        ? ` The registry lists ${t.total.toLocaleString()} products with this target; loaded here are the most cited plus the top ~100 from each major vendor. Use “Load all from vendor” for the rest of one vendor’s catalog.`
+        : data.truncated
+        ? ` The registry returns at most its first 500 matches per search (${Object.entries(data.totals).map(([t, n]) => `${n.toLocaleString()} for “${t}”`).join(", ")}). Add a clone, vendor or conjugate to the search to narrow it.`
+        : "";
+      const partialNote = data.partial ? " The registry was slow to answer part of this search, so some products may be missing; search again in a few minutes for the full list." : "";
+      const searched = data.searched.length > 1 && !t ? ` Searched “${data.searched.join("” and “")}”.` : "";
+      if (!data.items.length) {
+        setStatus(`No antibodies found for “${data.query}”.${searched}`);
+        $("results").hidden = true;
+        return;
+      }
+      $("results").hidden = false;
+      $("clone-chip").hidden = !cloneFilter;
+      $("clone-chip-text").textContent = cloneFilter ? `Clone ${cloneFilter}` : "";
+      const showClones = view === "clones" && !cloneFilter;
+      $("clones-view").hidden = !showClones;
+      $("products-view").hidden = showClones;
+      if (showClones) {
+        const gs = groups(rows);
+        setStatus(`${gs.length.toLocaleString()} clones across ${rows.length.toLocaleString()} products.${searched}${totalNote}${partialNote}`);
+        renderGroups(gs, rows);
+        return;
+      }
+      setStatus(`${rows.length.toLocaleString()} of ${data.items.length.toLocaleString()} products shown.${searched}${totalNote}${partialNote}`);
+      $("rows").innerHTML = rows.slice(0, shown).map((i) => {
+        return `<tr>
+          <td><button class="addbtn" type="button" data-add="${esc(i.rrid)}" aria-pressed="${inPanel(i.rrid)}" title="${inPanel(i.rrid) ? "Remove from panel" : "Add to panel"}">${inPanel(i.rrid) ? "✓" : "+"}</button></td>
+          <td title="${esc(i.target)}">${esc(short(i.target, 40))}<span class="sub">${esc(i.name)}</span></td>
+          <td>${orderLink(i, esc(i.vendor))}<span class="sub">${esc(i.catalog)}${i.discontinued ? '<span class="tag">discontinued</span>' : ""}</span></td>
+          <td>${orderLink(i, esc(i.clone))}<span class="sub">${esc(i.clonality)}</span></td>
+          <td class="hide-sm">${esc(i.host) || "—"}${i.reactivity.length ? `<span class="sub">vs ${esc(short(i.reactivity.join(", "), 30))}</span>` : ""}</td>
+          <td class="hide-sm">${esc(i.conjugate) || "—"}</td>
+          <td class="num">${i.citations}</td>
+          <td class="hide-sm"><a href="https://www.antibodyregistry.org/${esc(i.rrid)}">${esc(i.rrid)}</a>${omapTag(i.omap)}</td>
+        </tr>`;
+      }).join("");
+      $("more").hidden = rows.length <= shown;
+      $("more").textContent = `Show more (${(rows.length - shown).toLocaleString()} left)`;
+    }
+
+    function groups(rows) {
+      const m = new Map();
+      for (const i of rows) {
+        const k = cloneKey(i);
+        if (!k) continue;
+        if (!m.has(k)) m.set(k, { key: k, items: [] });
+        m.get(k).items.push(i);
+      }
+      const out = [...m.values()].map((g) => {
+        const it = g.items;
+        return {
+          key: g.key,
+          clone: mode(it.map((i) => i.clone).filter((c) => c.toUpperCase().replace(/\s+/g, "") === g.key))[0] || g.key,
+          target: mode(it.map((i) => i.target))[0] || "",
+          clonality: mode(it.map((i) => i.clonality))[0] || "",
+          vendors: mode(it.map((i) => i.vendor)),
+          hosts: mode(it.map((i) => i.host)),
+          conjugates: mode(it.map((i) => (isUnconj(i.conjugate) ? "Unconjugated" : i.conjugate))),
+          n: it.length,
+          discontinued: it.filter((i) => i.discontinued).length,
+          citations: it.reduce((a, i) => a + i.citations, 0),
+          omap: [...new Set(it.flatMap((i) => i.omap))],
+        };
+      });
+      out.forEach((g) => { g.pkey = paperKey(g); });
+      const pv = (g) => { const p = papers.get(g.pkey); return p && p.count != null ? p.count : -1; };
+      out.sort((a, b) => {
+        let d;
+        if (gSortKey === "clone") d = a.clone.localeCompare(b.clone);
+        else if (gSortKey === "papers") d = pv(a) - pv(b);
+        else d = a[gSortKey] - b[gSortKey];
+        return d * gSortDir || b.citations - a.citations || b.n - a.n;
+      });
+      return out;
+    }
+
+    function paperTargets(g) {
+      const t = data.gene
+        ? [data.gene.symbol, ...data.gene.synonyms]
+        : [g.target.split(/[\s,;(]/)[0], data.query];
+      return [...new Set(t.filter((x) => x && TOKEN.test(x)))].slice(0, 4);
+    }
+    function paperKey(g) {
+      if (!searchable(g.key)) return null;
+      const t = paperTargets(g);
+      return t.length ? `${g.clone}|${t.join(",")}` : null;
+    }
+
+    function papersCell(g) {
+      if (!g.pkey) return '<span title="Numeric or very short clone names cannot be searched reliably">—</span>';
+      const p = papers.get(g.pkey);
+      if (p === undefined || p === "loading") return '<span class="muted">…</span>';
+      if (!p) return "—";
+      return `<a href="${esc(p.url)}" title="${esc(p.query)}">${p.count.toLocaleString()}</a>`;
+    }
+
+    function renderGroups(gs, rows) {
+      const page = gs.slice(0, gShown);
+      $("grows").innerHTML = page.map((g, idx) => `<tr>
+          <td><button class="clonebtn" type="button" data-clone="${esc(g.key)}">${esc(g.clone)}</button>${omapTag(g.omap)}<span class="sub">${esc(g.clonality)}</span></td>
+          <td class="hide-sm" title="${esc(g.target)}">${esc(short(g.target, 30))}</td>
+          <td>${g.n}${g.discontinued ? `<span class="tag">${g.discontinued} discontinued</span>` : ""}<span class="sub">${esc(short(g.vendors.slice(0, 3).join(", "), 60))}${g.vendors.length > 3 ? ` +${g.vendors.length - 3}` : ""}</span></td>
+          <td class="hide-sm">${esc(g.hosts.join(", ")) || "—"}</td>
+          <td class="hide-sm"><span title="${esc(g.conjugates.join(", "))}">${g.conjugates.length}</span></td>
+          <td class="num">${g.citations}</td>
+          <td class="num" data-pkey="${esc(g.pkey || "")}">${papersCell(g)}</td>
+        </tr>`).join("");
+      $("gmore").hidden = gs.length <= gShown;
+      $("gmore").textContent = `Show more (${(gs.length - gShown).toLocaleString()} left)`;
+      const noClone = rows.filter((i) => !cloneKey(i)).length;
+      $("gnote").textContent = (noClone ? `${noClone.toLocaleString()} products list no clone (mostly polyclonals); see All products. ` : "") + "Open a clone to add its products to a panel.";
+      loadPapers(page.map((g) => g.pkey).filter(Boolean));
+    }
+
+    let inflight = 0;
+    const queue = [];
+    function loadPapers(keys) {
+      for (const k of keys) if (!papers.has(k)) { papers.set(k, "loading"); queue.push(k); }
+      pump();
+    }
+    function pump() {
+      while (inflight < 4 && queue.length) {
+        const k = queue.shift();
+        const [clone, targets] = k.split("|");
+        inflight++;
+        fetch(`/api/papers?clone=${encodeURIComponent(clone)}&targets=${encodeURIComponent(targets)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+          .then((p) => {
+            papers.set(k, p);
+            document.querySelectorAll(`td[data-pkey="${CSS.escape(k)}"]`).forEach((td) => {
+              td.innerHTML = p ? `<a href="${esc(p.url)}" title="${esc(p.query)}">${p.count.toLocaleString()}</a>` : "—";
+            });
+          })
+          .finally(() => { inflight--; pump(); });
+      }
+    }
+
+    function csv() {
+      const cols = ["rrid", "target", "name", "vendor", "catalog", "clone", "clonality", "host", "conjugate", "citations", "discontinued", "product_url"];
+      const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const omapIds = (i) => (omap ? i.omap.map((p) => omap.panels[p].id).join(" ") : "");
+      const lines = [cols.concat("omap_panels").join(",")].concat(filtered().map((i) => cols.map((c) => q(i[c])).concat(q(omapIds(i))).join(",")));
+      const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `antibodies-${data.query.replace(/[^\w-]+/g, "_")}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    $("form").addEventListener("submit", (e) => { e.preventDefault(); run($("q").value); });
+    document.querySelectorAll(".examples button").forEach((b) => b.addEventListener("click", () => run(b.dataset.q)));
+    $("f-more").addEventListener("change", (e) => { const v = e.target.value; e.target.value = ""; loadVendor(v); });
+    ["f-clonality", "f-host", "f-react", "f-conj", "f-disc", "f-omap"].forEach((id) => $(id).addEventListener("change", () => { shown = PAGE; gShown = GPAGE; render(); }));
+    $("f-text").addEventListener("input", () => { shown = PAGE; gShown = GPAGE; render(); });
+    $("more").addEventListener("click", () => { shown += PAGE; render(); });
+    $("csv").addEventListener("click", csv);
+    $("rows").addEventListener("click", (e) => { const b = e.target.closest("[data-add]"); if (b) togglePanel(b.dataset.add); });
+    $("panel-rows").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-remove]");
+      if (!b) return;
+      panel = panel.filter((x) => x.rrid !== b.dataset.remove); savePanel(); renderPanel(); if (data) render();
+    });
+    $("panel-csv").addEventListener("click", panelCsv);
+    $("pb-platform").value = pb.platform;
+    $("pb-species").value = pb.species;
+    $("pb-species").addEventListener("change", () => { pb.species = $("pb-species").value; savePb(); suggestions = []; drawSuggestions(); $("pb-status").textContent = ""; });
+    $("pb-platform").addEventListener("change", () => { pb.platform = $("pb-platform").value; savePb(); renderPanel(); suggestions = []; drawSuggestions(); $("pb-status").textContent = ""; });
+    $("pb-plan").addEventListener("change", (e) => {
+      if (e.target.id === "pb-tissue") { pb.tissue = e.target.value; savePb(); renderPlan(); }
+      if (e.target.id === "pb-channels") { pb.channels = e.target.value; savePb(); renderPlan(); }
+    });
+    $("pb-suggest").addEventListener("click", suggest);
+    $("pb-list").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); suggest(); } });
+    $("pb-suggestions").addEventListener("change", (e) => {
+      const k = e.target.dataset.sg; if (k === undefined) return;
+      suggestions[k].pick = Number(e.target.value); suggestions[k].note = ""; drawSuggestions();
+    });
+    $("pb-suggestions").addEventListener("click", (e) => {
+      const one = e.target.closest("[data-sgadd]");
+      if (one) { addSuggestion(Number(one.dataset.sgadd)); savePanel(); renderPanel(); drawSuggestions(); if (data) render(); }
+      if (e.target.id === "pb-addall") { suggestions.forEach((_, k) => addSuggestion(k)); savePanel(); renderPanel(); drawSuggestions(); if (data) render(); }
+    });
+    $("panel-clear").addEventListener("click", () => { panel = []; savePanel(); renderPanel(); if (data) render(); });
+    renderPanel();
+    document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { cloneFilter = null; setView(b.dataset.view); }));
+    $("grows").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-clone]");
+      if (!b) return;
+      cloneFilter = b.dataset.clone; shown = PAGE; render();
+      $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $("gene").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-clone]");
+      if (!b) return;
+      cloneFilter = b.dataset.clone; shown = PAGE; render();
+      $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $("clone-clear").addEventListener("click", () => { cloneFilter = null; render(); });
+    $("gmore").addEventListener("click", () => { gShown += GPAGE; render(); });
+    document.querySelectorAll("th button[data-gsort]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.gsort;
+      gSortDir = k === gSortKey ? -gSortDir : (k === "clone" ? 1 : -1);
+      gSortKey = k;
+      document.querySelectorAll("th button[data-gsort]").forEach((x) => x.removeAttribute("aria-sort"));
+      b.setAttribute("aria-sort", gSortDir < 0 ? "descending" : "ascending");
+      render();
+    }));
+    document.querySelectorAll("th button[data-sort]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.sort;
+      sortDir = k === sortKey ? -sortDir : (k === "citations" ? -1 : 1);
+      sortKey = k;
+      document.querySelectorAll("th button[data-sort]").forEach((x) => x.removeAttribute("aria-sort"));
+      b.setAttribute("aria-sort", sortDir < 0 ? "descending" : "ascending");
+      render();
+    }));
+    window.addEventListener("popstate", () => {
+      const q = new URLSearchParams(location.search).get("q");
+      if (q) run(q, false);
+    });
+
+    const q0 = new URLSearchParams(location.search).get("q");
+    if (q0) run(q0, false); else $("q").focus();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+.wrangler/
+node_modules/
+.DS_Store
+.cache/
+# Built from vendor gene lists by scripts/build-panels.py; not redistributed here.
+public/data/panels-*.json

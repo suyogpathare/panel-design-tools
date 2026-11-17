@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PanelScout — Suyog Pathare</title>
+  <meta name="description" content="Paste a gene list and see how much of it each pre-designed Xenium and CosMx spatial transcriptomics panel covers.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .ps-head { padding-top: 64px; padding-bottom: 28px; }
+    .ps-head h1 { font-size: clamp(36px, 6vw, 56px); }
+    .ps-head p { color: var(--muted); margin: 14px 0 0; max-width: 42em; }
+    .entry { margin-top: 28px; }
+    .entry textarea {
+      display: block; width: 100%; box-sizing: border-box; min-height: 130px; resize: vertical;
+      font: inherit; font-size: 16px; line-height: 1.5; color: var(--text);
+      background: var(--band); border: 1px solid transparent; border-radius: 14px; padding: 14px 18px;
+    }
+    .entry textarea:focus { outline: none; border-color: var(--pill); background: var(--bg); }
+    .entry-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 12px; }
+    .entry-bar button.pill { border: 0; cursor: pointer; font: inherit; }
+    .seg { display: inline-flex; background: var(--band); border-radius: 10px; padding: 3px; }
+    .seg button { border: 0; background: none; font: inherit; font-size: 14px; color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+    .seg button[aria-pressed=true] { background: var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+    .examples { color: var(--muted); font-size: 14px; }
+    .linkbtn { border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+    .linkbtn:hover { text-decoration: underline; }
+
+    .ps-body { padding-top: 8px; padding-bottom: 96px; }
+    .status { color: var(--muted); font-size: 15px; min-height: 22px; margin: 0 0 16px; }
+    .status.err { color: #d70015; }
+    h2.sec { font-size: 22px; margin: 36px 0 6px; }
+    .sec-note { color: var(--muted); font-size: 14px; margin: 0 0 14px; max-width: 46em; }
+
+    .resolve { background: var(--band); border-radius: 18px; padding: 18px 22px; font-size: 14px; }
+    .resolve p { margin: 4px 0; }
+    .resolve .lbl { color: var(--muted); }
+    .chip { display: inline-block; border: 1px solid var(--line); border-radius: 7px; padding: 1px 7px; margin: 2px 3px 2px 0; font-size: 13px; background: var(--bg); white-space: nowrap; }
+    .chip.miss { border-style: dashed; color: var(--muted); }
+    a.chip.miss { color: var(--link); text-decoration: none; }
+    a.chip.miss:hover { border-style: solid; }
+    .matrix td.g a { color: inherit; text-decoration: none; }
+    .matrix td.g a:hover { color: var(--link); text-decoration: underline; }
+    .chip button { border: 0; background: none; padding: 0 0 0 2px; font: inherit; color: var(--link); cursor: pointer; }
+
+    .tablewrap { overflow-x: auto; border-top: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+    td.num, th.num { text-align: right; padding-right: 20px; white-space: nowrap; }
+    .sub { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+    .cov { min-width: 150px; }
+    .covbar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 6px; overflow: hidden; }
+    .covbar span { display: block; height: 100%; background: var(--pill); border-radius: 3px; }
+    .missing { min-width: 220px; }
+
+    table.matrix { width: auto; }
+    .matrix th.rot { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 8px 4px; text-align: left; vertical-align: bottom; font-weight: 500; }
+    .matrix td.c { text-align: center; padding: 6px 4px; width: 28px; }
+    .matrix td.g { position: sticky; left: 0; background: var(--bg); padding-right: 14px; white-space: nowrap; font-weight: 500; }
+    .matrix th.g { position: sticky; left: 0; background: var(--bg); vertical-align: bottom; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--pill); }
+    .dot.shared { background: none; border: 2px solid var(--pill); width: 6px; height: 6px; }
+    .dot.addon { background: var(--muted); }
+    .x { color: var(--muted); font-size: 12px; cursor: help; }
+    .legend { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; align-items: center; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+    .credits { color: var(--muted); font-size: 12px; margin-top: 48px; line-height: 1.6; }
+    .credits ul { margin: 6px 0 10px; padding-left: 18px; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/">Suyog Pathare</a>
+      <nav aria-label="Sections">
+        <a href="/#tools">Tools</a>
+        <a href="/#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="ps-head">
+      <div class="wrap">
+        <h1>PanelScout</h1>
+        <p>Paste a gene list to see how much of it each pre-designed imaging spatial transcriptomics panel covers, which genes each panel is missing, and which genes no panel has. Uses the gene lists 10x Genomics and Bruker publish for Xenium and CosMx. Protein and common names such as PD-L1 or Ki-67 are matched to gene symbols.</p>
+        <form class="entry" id="form">
+          <label for="genes" class="sr-only" style="position:absolute;left:-9999px">Gene list</label>
+          <textarea id="genes" placeholder="CD3E, CD8A, PD-L1, FOXP3 … one per line, or separated by commas or spaces" spellcheck="false" autocomplete="off"></textarea>
+          <div class="entry-bar">
+            <div class="seg" role="group" aria-label="Species">
+              <button type="button" data-sp="human" aria-pressed="true">Human</button>
+              <button type="button" data-sp="mouse" aria-pressed="false">Mouse</button>
+            </div>
+            <button class="pill" type="submit">Check coverage</button>
+            <span class="examples">Try
+              <button type="button" class="linkbtn" data-ex="io">tumor immune markers</button>,
+              <button type="button" class="linkbtn" data-ex="brain">mouse brain cell types</button>
+            </span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="ps-body">
+      <div class="wrap">
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div id="out" hidden>
+          <div class="resolve" id="resolve"></div>
+
+          <h2 class="sec">Coverage by panel</h2>
+          <p class="sec-note">Sorted by how many of your genes each panel contains, then by panel size. Smaller panels usually cost less per sample.</p>
+          <div class="tablewrap">
+            <table id="panels">
+              <thead><tr><th>Panel</th><th class="num">Panel targets</th><th class="cov">Your genes covered</th><th class="missing">Missing from this panel</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div id="nowhere"></div>
+
+          <h2 class="sec">Gene by panel</h2>
+          <div class="legend">
+            <span><i class="dot"></i> in the panel</span>
+            <span><i class="dot shared"></i> shared probe: also detects a related gene</span>
+            <span><i class="dot addon"></i> in the swappable add-on module</span>
+            <span><span class="x">excl.</span> left out on purpose by the vendor</span>
+            <button type="button" class="linkbtn" id="csv">Download CSV</button>
+            <button type="button" class="linkbtn" id="copylink">Copy link to this list</button>
+          </div>
+          <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
+          <p class="sec-note" id="matrix-more" style="margin-top:10px"></p>
+        </div>
+
+        <div class="credits" id="credits">
+          <p>Gene lists, as published by each vendor (<span id="built">—</span>):</p>
+          <ul id="sources"></ul>
+          <p>Gene symbols and aliases: <a href="https://www.genenames.org">HGNC</a> (human) and <a href="https://www.informatics.jax.org">MGI</a> (mouse). Vendor names that have since been renamed are matched to the current symbol. Probes written as several genes (for example HBA1/2) count for each of those genes and are marked as shared.</p>
+          <p>Not included yet: Vizgen MERSCOPE (gene lists are shared after registration) and Visium HD (its probe set covers most of the protein-coding transcriptome).</p>
+          <p class="cite"><b>How to cite:</b> Pathare S. PanelScout: gene list coverage across pre-designed imaging spatial transcriptomics panels. Version 1.0, 2026. https://suyogpathare.com/panelscout/<span class="doi"></span></p>
+          <p>Scientific design and validation by Suyog Pathare.</p>
+          <p>Independent tool, not affiliated with or endorsed by 10x Genomics or Bruker. Panels and their contents change; confirm with the vendor before ordering. Your gene list stays in your browser.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© <span id="yr"></span> Suyog Pathare</div>
+  </footer>
+
+  <script>
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const SHORT = {
+      "xenium-5k-human": "Xenium 5K", "xenium-multi-human": "Xenium Multi-Tissue", "xenium-io-human": "Xenium Immuno-Onc",
+      "xenium-brain-human": "Xenium Brain", "xenium-breast-human": "Xenium Breast", "xenium-colon-human": "Xenium Colon",
+      "xenium-lung-human": "Xenium Lung", "xenium-skin-human": "Xenium Skin",
+      "cosmx-wtx-human": "CosMx WTX", "cosmx-6k-human": "CosMx 6K", "cosmx-ucc-human": "CosMx 1K UCC", "cosmx-io-human": "CosMx IO 100",
+      "xenium-5k-mouse": "Xenium 5K", "xenium-multi-mouse": "Xenium Tissue Atlas", "xenium-brain-mouse": "Xenium Brain",
+      "cosmx-ucc-mouse": "CosMx 1K UCC", "cosmx-neuro-mouse": "CosMx 1K Neuro",
+    };
+    const EXAMPLES = {
+      io: ["human", "CD3E CD4 CD8A FOXP3 MS4A1 CD19 NCAM1 CD68 CD163 ITGAX PTPRC PD-1 PD-L1 LAG3 HAVCR2 TIGIT CTLA4 GZMB PRF1 IFNG Ki-67 EPCAM KRT8 VIM"],
+      brain: ["mouse", "Rbfox3 Slc17a7 Gad1 Gad2 Pvalb Sst Vip Gfap Aqp4 Aldh1l1 Olig2 Mbp Plp1 Pdgfra Tmem119 P2ry12 Cx3cr1 Cldn5 Pecam1 Mki67"],
+    };
+    const cache = {};
+    let species = "human", data = null, last = null, runId = 0, linkable = true, matrixAll = false;
+    const LINK_MAX = 400, MATRIX_MAX = 500;
+
+    $("yr").textContent = new Date().getFullYear();
+
+    async function load(sp) {
+      if (!cache[sp]) {
+        let r;
+        try { r = await fetch(`/data/panels-${sp}.json`); } catch { r = null; }
+        if (!r || !r.ok) throw new Error("Could not load the panel lists. Check your connection and try again.");
+        const d = await r.json();
+        d.upper = new Map(d.genes.map((g, i) => [g.toUpperCase(), i]));
+        d.known = new Set(d.known.map((g) => g.toUpperCase()));
+        d.sets = d.panels.map((p) => ({ g: new Set(p.g), addon: new Set(p.addon), excluded: new Map(Object.entries(p.excluded || {}).map(([k, v]) => [k.toUpperCase(), v])) }));
+        cache[sp] = d;
+      }
+      return cache[sp];
+    }
+
+    function setSpecies(sp) {
+      species = sp;
+      document.querySelectorAll("[data-sp]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.sp === sp)));
+    }
+
+    const tokens = (text) => {
+      const seen = new Set(), out = [];
+      // Dashes from Word/PDF (‐ ‑ ‒ – — −) become plain hyphens.
+      const clean = text.replace(/[\u2010-\u2015\u2212]/g, "-");
+      for (const t of clean.split(/[\s,;]+/)) {
+        const s = t.trim().replace(/^["'(\[]+|["')\].:+]+$/g, "");
+        if (s && !seen.has(s.toUpperCase())) { seen.add(s.toUpperCase()); out.push(s); }
+      }
+      return out;
+    };
+
+    // input -> { input, gene, idx, kind: ok|renamed|ambiguous|offpanel|unknown, alts }
+    const GREEK = { "\u03b1": "A", "\u03b2": "B", "\u03b3": "G", "\u03b4": "D", "\u03b5": "E", "\u03ba": "K", "\u03bb": "L" };
+    function resolve(d, t) {
+      const r = resolveOne(d, t);
+      if (r.kind !== "unknown") return r;
+      // Retry spellings people write: TNF-α -> TNFA, IFNγ -> IFNG, HLA DR -> HLADR.
+      const g = t.toLowerCase().replace(/[\u03b1-\u03c9]/g, (c) => GREEK[c] || c);
+      for (const v of new Set([g, g.replace(/-/g, ""), t.replace(/-/g, "")])) {
+        if (v.toUpperCase() === t.toUpperCase()) continue;
+        const x = resolveOne(d, v);
+        if (x.kind !== "unknown") return { ...x, input: t, kind: x.kind === "ok" ? "renamed" : x.kind };
+      }
+      return r;
+    }
+    function resolveOne(d, t) {
+      const U = t.toUpperCase();
+      const direct = d.upper.get(U);
+      if (direct !== undefined && d.known.has(U)) return { input: t, gene: d.genes[direct], idx: direct, kind: "ok" };
+      const hits = d.alias[U];
+      if (hits && hits.length) {
+        const idx = d.upper.get(hits[0].toUpperCase());
+        return { input: t, gene: hits[0], idx, kind: hits.length > 1 ? "ambiguous" : "renamed", alts: hits.slice(1) };
+      }
+      if (direct !== undefined) return { input: t, gene: d.genes[direct], idx: direct, kind: "ok" };
+      if (d.known.has(U)) return { input: t, gene: t, idx: undefined, kind: "offpanel" };
+      return { input: t, gene: t, idx: undefined, kind: "unknown" };
+    }
+
+    function chips(list, cls = "") {
+      return list.map((g) => `<span class="chip ${cls}">${esc(g)}</span>`).join("");
+    }
+
+    async function run(pushHash = true) {
+      const raw = $("genes").value;
+      const toks = tokens(raw);
+      if (!toks.length) { $("status").textContent = "Paste at least one gene."; $("out").hidden = true; return; }
+      $("status").className = "status";
+      $("status").textContent = "Loading panel lists…";
+      const id = ++runId, sp = species;
+      let d;
+      try { d = await load(sp); }
+      catch (e) { if (id === runId) { $("status").className = "status err"; $("status").textContent = e.message; } return; }
+      if (id !== runId) return; // a newer check started while this one was loading
+      data = d;
+
+      const seen = new Set(), rows = [];
+      for (const t of toks) {
+        const r = resolve(data, t);
+        const key = r.gene.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push(r);
+      }
+      last = rows;
+      matrixAll = false;
+      linkable = toks.length <= LINK_MAX;
+      if (pushHash) history.replaceState(null, "", linkable ? `#${species}:${encodeURIComponent(toks.join(","))}` : location.pathname);
+      render(rows);
+    }
+
+    function render(rows) {
+      const d = data;
+      const onPanel = rows.filter((r) => r.idx !== undefined);
+      const renamed = rows.filter((r) => r.kind === "renamed" || r.kind === "ambiguous");
+      const offpanel = rows.filter((r) => r.kind === "offpanel");
+      const unknown = rows.filter((r) => r.kind === "unknown");
+
+      const nk = rows.length - unknown.length;
+      $("status").textContent = `${nk.toLocaleString()} gene${nk === 1 ? "" : "s"} checked against ${d.panels.length} ${species} panels` +
+        (unknown.length ? `; ${unknown.length.toLocaleString()} ${unknown.length === 1 ? "entry" : "entries"} not recognized.` : ".");
+
+      // What we understood.
+      let h = "";
+      if (renamed.length) {
+        h += `<p><span class="lbl">Matched to gene symbols:</span> ` + renamed.map((r) =>
+          `<span class="chip">${esc(r.input)} → ${esc(r.gene)}` +
+          (r.alts && r.alts.length ? ` <span class="sub" style="display:inline">or</span> ` +
+            r.alts.slice(0, 4).map((a) => `<button type="button" data-swap="${esc(r.input)}" data-to="${esc(a)}">${esc(a)}</button>`).join(", ") : "") +
+          `</span>`).join("") + `</p>`;
+      }
+      if (unknown.length) h += `<p><span class="lbl">Not recognized as ${species} gene symbols (check spelling):</span> ${chips(unknown.map((r) => r.input), "miss")}</p>`;
+      if (!h) h = `<p><span class="lbl">All ${rows.length} entries are current ${species} gene symbols.</span></p>`;
+      $("resolve").innerHTML = h;
+
+      // Panel table.
+      const stats = d.panels.map((p, i) => {
+        const s = d.sets[i];
+        const cov = onPanel.filter((r) => s.g.has(r.idx));
+        const miss = rows.filter((r) => r.kind !== "unknown" && !(r.idx !== undefined && s.g.has(r.idx)));
+        return { p, i, cov, miss, addon: cov.filter((r) => s.addon.has(r.idx)), shared: cov.filter((r) => p.shared[r.idx]) };
+      });
+      const total = rows.length - unknown.length;
+      stats.sort((a, b) => b.cov.length - a.cov.length || (a.p.targets || a.p.n) - (b.p.targets || b.p.n));
+      $("panels").tBodies[0].innerHTML = stats.map((s) => {
+        const pct = total ? Math.round((100 * s.cov.length) / total) : 0;
+        const notes = [];
+        if (s.addon.length) notes.push(`${s.addon.length} in the 50-gene add-on module, which can be swapped for a custom one`.replace("50-gene", s.p.id === "cosmx-io-human" ? "10-gene" : "50-gene"));
+        if (s.shared.length) notes.push(`${s.shared.length} detected by a probe shared with a related gene`);
+        const missNames = s.miss.map((r) => {
+          const why = d.sets[s.i].excluded.get(r.gene.toUpperCase());
+          return why ? `<span class="chip miss" title="${esc(why)}">${esc(r.gene)}*</span>` : `<span class="chip miss">${esc(r.gene)}</span>`;
+        });
+        const SHOW = 14;
+        const missHtml = !missNames.length ? `<span class="sub">none</span>` :
+          missNames.length <= SHOW ? missNames.join("") :
+          missNames.slice(0, SHOW).join("") + `<button type="button" class="linkbtn" data-more="${s.i}" style="font-size:13px">and ${missNames.length - SHOW} more</button><span hidden data-rest="${s.i}">${missNames.slice(SHOW).join("")}</span>`;
+        const excl = s.miss.some((r) => d.sets[s.i].excluded.has(r.gene.toUpperCase()));
+        return `<tr>
+          <td><a href="${esc(s.p.page)}" target="_blank" rel="noopener">${esc(s.p.name)}</a><span class="sub">${esc(s.p.vendor)}</span></td>
+          <td class="num">${(s.p.targets || s.p.n).toLocaleString()}${s.p.targets && s.p.n !== s.p.targets ? `<span class="sub" title="Some probes detect several related genes, so the panel covers more genes than it has targets">${s.p.n.toLocaleString()} genes</span>` : ""}</td>
+          <td class="cov"><b>${s.cov.length}</b> of ${total} <span class="sub" style="display:inline">(${pct}%)</span>
+            <div class="covbar" aria-hidden="true"><span style="width:${pct}%"></span></div>
+            ${notes.map((n) => `<span class="sub">${esc(n)}</span>`).join("")}</td>
+          <td class="missing">${missHtml}${excl ? `<span class="sub">* left out of the panel on purpose; hover for the vendor's reason</span>` : ""}</td>
+        </tr>`;
+      }).join("");
+
+      // Genes no panel has.
+      const nowhere = rows.filter((r) => r.kind !== "unknown" && !d.sets.some((s) => r.idx !== undefined && s.g.has(r.idx)));
+      $("nowhere").innerHTML = nowhere.length ? `<h2 class="sec">Not on any pre-designed ${species} panel</h2>
+        <p class="sec-note">These would need a custom panel or a custom add-on (check each vendor's add-on size limits and probe design rules), or you could detect the protein instead. Each gene links to its antibodies in <a href="/abscout/">AbScout</a>.</p>
+        <div>${nowhere.map((r) => `<a class="chip miss" href="/abscout/?q=${encodeURIComponent(r.gene)}" title="Antibodies for ${esc(r.gene)} in AbScout">${esc(r.gene)}</a>`).join("")}</div>` : "";
+
+      // Matrix, panels in the same order as the table.
+      const order = stats.map((s) => s.i);
+      const allKnown = rows.filter((r) => r.kind !== "unknown");
+      const known = matrixAll ? allKnown : allKnown.slice(0, MATRIX_MAX);
+      let m = `<thead><tr><th class="g">Gene</th>${order.map((i) => `<th class="rot" title="${esc(d.panels[i].name)}">${esc(SHORT[d.panels[i].id] || d.panels[i].name)}</th>`).join("")}</tr></thead><tbody>`;
+      for (const r of known) {
+        m += `<tr><td class="g"><a href="/abscout/?q=${encodeURIComponent(r.gene)}" title="Antibodies for ${esc(r.gene)} in AbScout">${esc(r.gene)}</a>${r.input.toUpperCase() !== r.gene.toUpperCase() ? `<span class="sub">${esc(r.input)}</span>` : ""}</td>`;
+        for (const i of order) {
+          const s = d.sets[i], p = d.panels[i];
+          let c = "";
+          if (r.idx !== undefined && s.g.has(r.idx)) {
+            const probe = p.shared[r.idx];
+            if (probe) c = `<i class="dot shared" title="${esc(`Probe ${probe} also detects the related gene(s)`)}"></i><span style="position:absolute;left:-9999px">shared</span>`;
+            else if (s.addon.has(r.idx)) c = `<i class="dot addon" title="In the swappable add-on module"></i><span style="position:absolute;left:-9999px">add-on</span>`;
+            else c = `<i class="dot" title="In the panel"></i><span style="position:absolute;left:-9999px">yes</span>`;
+          } else {
+            const why = s.excluded.get(r.gene.toUpperCase());
+            if (why) c = `<span class="x" title="${esc(why)}">excl.</span>`;
+          }
+          m += `<td class="c">${c}</td>`;
+        }
+        m += `</tr>`;
+      }
+      $("matrix").innerHTML = m + "</tbody>";
+      $("matrix-more").innerHTML = allKnown.length > known.length
+        ? `Showing the first ${known.length} of ${allKnown.length.toLocaleString()} genes. <button type="button" class="linkbtn" id="matrix-all">Show all</button> or download the CSV.` : "";
+      $("out").hidden = false;
+    }
+
+    function csv() {
+      if (!last || !data) return;
+      const d = data, order = d.panels.map((_, i) => i);
+      const lines = [["gene", "input", ...order.map((i) => d.panels[i].name)]];
+      for (const r of last.filter((x) => x.kind !== "unknown")) {
+        lines.push([r.gene, r.input, ...order.map((i) => {
+          const s = d.sets[i], p = d.panels[i];
+          if (r.idx !== undefined && s.g.has(r.idx)) return p.shared[r.idx] ? `shared probe ${p.shared[r.idx]}` : s.addon.has(r.idx) ? "yes (add-on)" : "yes";
+          return s.excluded.get(r.gene.toUpperCase()) ? "excluded by vendor" : "no";
+        })]);
+      }
+      const text = lines.map((l) => l.map((v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(",")).join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+      a.download = `panelscout-${species}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    async function showSources() {
+      try {
+        const lists = await Promise.all(["human", "mouse"].map(load));
+        $("built").textContent = `retrieved ${lists[0].built}`;
+        $("sources").innerHTML = lists.flatMap((d) => d.panels).map((p) =>
+          `<li><a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.name)}</a> (${(p.targets || p.n).toLocaleString()} targets), <a href="${esc(p.source)}" target="_blank" rel="noopener">source file</a></li>`).join("");
+      } catch { /* the check itself reports load errors */ }
+    }
+
+    $("form").addEventListener("submit", (e) => { e.preventDefault(); run(); });
+    $("genes").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } });
+    document.querySelectorAll("[data-sp]").forEach((b) => b.addEventListener("click", () => { setSpecies(b.dataset.sp); if ($("genes").value.trim()) run(); }));
+    document.querySelectorAll("[data-ex]").forEach((b) => b.addEventListener("click", () => {
+      const [sp, list] = EXAMPLES[b.dataset.ex];
+      setSpecies(sp);
+      $("genes").value = list.split(" ").join(", ");
+      run();
+    }));
+    document.addEventListener("click", (e) => {
+      if (e.target.id === "matrix-all") { matrixAll = true; render(last); return; }
+      const more = e.target.closest("[data-more]");
+      if (more) { more.nextElementSibling.hidden = false; more.remove(); return; }
+      const sw = e.target.closest("[data-swap]");
+      if (sw) {
+        const from = sw.dataset.swap, to = sw.dataset.to;
+        // Replace every occurrence, including ones wrapped in punctuation such as (CD3) or CD3+.
+        const re = new RegExp(`(^|[^A-Za-z0-9_-])${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^A-Za-z0-9_-])`, "gi");
+        $("genes").value = $("genes").value.replace(/[\u2010-\u2015\u2212]/g, "-").replace(re, `$1${to}`);
+        run();
+      }
+    });
+    $("csv").addEventListener("click", csv);
+    $("copylink").addEventListener("click", async () => {
+      if (!linkable) { $("copylink").textContent = `Lists over ${LINK_MAX} genes are too long for a link; use the CSV`; setTimeout(() => { $("copylink").textContent = "Copy link to this list"; }, 3000); return; }
+      try { await navigator.clipboard.writeText(location.href); $("copylink").textContent = "Link copied"; }
+      catch { $("copylink").textContent = "Copy the address bar"; }
+      setTimeout(() => { $("copylink").textContent = "Copy link to this list"; }, 2000);
+    });
+
+    // A shared link: #human:CD4,CD8A
+    function fromHash() {
+      const m = location.hash.match(/^#(human|mouse):(.+)$/);
+      if (!m) return;
+      let list;
+      try { list = decodeURIComponent(m[2]); } catch { list = m[2].replace(/%[0-9A-Fa-f]{2}/g, (c) => { try { return decodeURIComponent(c); } catch { return ""; } }); }
+      setSpecies(m[1]);
+      $("genes").value = list.split(",").join(", ");
+      run(false);
+    }
+    window.addEventListener("hashchange", fromHash);
+    fromHash();
+    showSources();
+  })();
+  </script>
+</body>
+</html>
