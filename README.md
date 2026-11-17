@@ -1,5 +1,7 @@
 # Panel design tools: AbScout and PanelScout
 
+[![DOI](https://zenodo.org/badge/1462079432.svg)](https://doi.org/10.5281/zenodo.24326636)
+
 Free web tools for designing spatial biology panels. Live at
 [suyogpathare.com](https://suyogpathare.com/#tools).
 

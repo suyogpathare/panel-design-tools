@@ -10,6 +10,7 @@ version: 1.0.0
 date-released: 2026-11-17
 license: MIT
 repository-code: "https://github.com/suyogpathare/panel-design-tools"
+doi: 10.5281/zenodo.24326636
 url: "https://suyogpathare.com/#tools"
 abstract: >-
   AbScout searches the Antibody Registry for a target, ranks antibodies by
