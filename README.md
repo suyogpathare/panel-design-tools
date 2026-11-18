@@ -1,4 +1,4 @@
-# Panel design tools: AbScout and PanelScout
+# Panel design tools: AbScout, PanelScout and Methods Writer
 
 [![DOI](https://zenodo.org/badge/1462079432.svg)](https://doi.org/10.5281/zenodo.24326636)
 
@@ -28,6 +28,14 @@ Scientific design and validation by Suyog Pathare.
   (10x Genomics Xenium JSON, Bruker CosMx Excel) or use any CSV/TXT gene list,
   and the page reads them in your browser. Aliases and common shorthand are
   resolved through HGNC (human) and MGI (mouse).
+- **[Methods Writer](https://suyogpathare.com/methods/)**: write the methods
+  section and channel metadata for a multiplex tissue imaging study. The form
+  follows the MITI reporting guidelines (Schapiro et al., Nature Methods 2022)
+  for specimen preparation, staining, imaging and image processing, imports
+  antibodies from an AbScout panel, and exports draft methods paragraphs, a
+  MITI channel-level metadata CSV and a JSON record. It lists the MITI fields
+  still empty; the text is built only from what the user enters, and nothing
+  leaves the browser.
 
 Not affiliated with or endorsed by any vendor or database named here.
 
@@ -41,11 +49,13 @@ Not affiliated with or endorsed by any vendor or database named here.
 | [YCharOS](https://ycharos.com) via [Only Good Antibodies](https://onlygoodantibodies.co.uk) | knockout results (`public/data/ko.json`, built) | CC BY 4.0 |
 | [FPbase](https://www.fpbase.org) | dye spectra (`public/data/dyes.json`, built) | CC BY-SA 4.0 |
 | [HGNC](https://www.genenames.org), [MGI](https://www.informatics.jax.org) | gene symbols and aliases (`public/data/genes-*.json`, built) | see sites |
+| [MITI](https://github.com/miti-consortium/MITI) | field definitions and value lists (Methods Writer) | MIT; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 | Vendor panel files | PanelScout | loaded by each user from the vendor; never hosted or redistributed here |
 
 ## Layout
 
-- `public/abscout/index.html`, `public/panelscout/index.html`: the tools
+- `public/abscout/index.html`, `public/panelscout/index.html`,
+  `public/methods/index.html`: the tools
   (plain HTML and JavaScript, no build step).
 - `src/worker.js`: Cloudflare Worker serving `public/` plus the API AbScout
   uses: `/api/antibodies?q=...[&vendor=...][&species=Human|Mouse|Rat]`,

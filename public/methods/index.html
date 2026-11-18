@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Methods Writer — Suyog Pathare</title>
+  <meta name="description" content="Write the methods section and channel metadata for a multiplex tissue imaging study, organized by the MITI reporting guidelines.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .mw-head { padding-top: 64px; padding-bottom: 20px; }
+    .mw-head h1 { font-size: clamp(36px, 6vw, 56px); }
+    .mw-head p { color: var(--muted); margin: 14px 0 0; max-width: 42em; }
+    .mw-body { padding-top: 8px; padding-bottom: 96px; }
+    .panel { border: 1px solid var(--line); border-radius: 18px; padding: 18px 22px; margin-bottom: 20px; }
+    .panel > summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+    .panel > summary .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+    .note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px 18px; margin-top: 14px; }
+    .fld { display: flex; flex-direction: column; gap: 4px; font-size: 14px; min-width: 0; }
+    .fld .lab { font-weight: 500; }
+    .tagm { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; white-space: nowrap; }
+    .tagm.req { color: var(--link); }
+    input[type=text], textarea {
+      font: inherit; font-size: 14px; color: var(--text); background: var(--band); border: 1px solid var(--line);
+      border-radius: 10px; padding: 7px 10px; width: 100%; box-sizing: border-box; min-width: 0;
+    }
+    input[type=text]:focus, textarea:focus { outline: none; border-color: var(--pill); background: var(--bg); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 14px; }
+    .linkbtn { border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+    .linkbtn:hover { text-decoration: underline; }
+    .tablewrap { overflow-x: auto; margin-top: 12px; border-top: 1px solid var(--line); }
+    table { border-collapse: collapse; font-size: 13px; min-width: 1180px; width: 100%; }
+    th, td { text-align: left; padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+    td input[type=text] { padding: 5px 7px; font-size: 13px; border-radius: 8px; }
+    td.c-s { width: 3.6em; } td.c-m { width: 7em; } td.c-l { width: 10em; }
+    td.del { width: 1.5em; }
+    td.del button { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 4px; }
+    .out { min-height: 300px; font-size: 13px; line-height: 1.55; margin-top: 8px; }
+    .check { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+    .check li { margin: 3px 0; }
+    .check .miss { color: var(--muted); }
+    .h3 { font-size: 15px; margin: 22px 0 0; }
+    .credits { color: var(--muted); font-size: 12px; margin-top: 40px; line-height: 1.6; }
+    .credits.cite { margin-top: 12px; }
+    .flash { color: var(--muted); font-size: 13px; min-height: 18px; margin-top: 8px; }
+    .load { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/">Suyog Pathare</a>
+      <nav aria-label="Sections">
+        <a href="/#tools">Tools</a>
+        <a href="/#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="mw-head">
+      <div class="wrap">
+        <h1>Methods Writer</h1>
+        <p>Fill in what you did, and get a methods section and a channel metadata table for a multiplex tissue imaging study. Fields follow the MITI reporting guidelines, so the details reviewers and data repositories ask for are less likely to be left out.</p>
+      </div>
+    </section>
+
+    <section class="mw-body">
+      <div class="wrap">
+        <div id="sections"></div>
+
+        <details class="panel" id="abs-panel" open>
+          <summary>Antibodies and channels <span class="sub" id="abs-count"></span></summary>
+          <p class="note">One row per channel, including the nuclear stain. The channel name should match the name in your image file. Labels such as 165Ho are written to the metal isotope columns of the CSV; other labels go to the fluorophore column.</p>
+          <div class="tablewrap"><table>
+            <thead><tr id="abs-head"></tr></thead>
+            <tbody id="abs-rows"></tbody>
+          </table></div>
+          <div class="actions">
+            <button class="linkbtn" type="button" id="abs-add">Add row</button>
+            <button class="linkbtn" type="button" id="abs-import">Import panel from AbScout</button>
+          </div>
+          <p class="flash" id="abs-flash" aria-live="polite"></p>
+        </details>
+
+        <details class="panel" open>
+          <summary>Methods text</summary>
+          <p class="note">Built only from what you entered; empty fields are left out. Read it and edit it before use.</p>
+          <textarea id="out" class="out" readonly aria-label="Methods text"></textarea>
+          <h3 class="h3">MITI fields still empty</h3>
+          <p class="note" style="margin-top:4px">The fields on this page that MITI marks required or recommended. MITI also covers clinical, file and image-header fields that this page does not ask for; your repository's template collects those.</p>
+          <ul class="check" id="check"></ul>
+          <div class="actions">
+            <button class="linkbtn" type="button" id="copy">Copy text</button>
+            <button class="linkbtn" type="button" id="csv">Download channel CSV</button>
+            <button class="linkbtn" type="button" id="json">Download JSON</button>
+            <label class="linkbtn load">Load JSON<input type="file" id="file" accept=".json,application/json" hidden></label>
+            <button class="linkbtn" type="button" id="print">Print</button>
+            <button class="linkbtn" type="button" id="clear">Clear all</button>
+          </div>
+          <p class="flash" id="flash" aria-live="polite"></p>
+          <p class="note">Saved in this browser only, and nothing is sent anywhere. Download the JSON to keep a copy or move it to another computer.</p>
+        </details>
+
+        <p class="credits">Field definitions and value lists come from the MITI reporting guidelines: Schapiro D, Yapp C, Sokolov A, et al. MITI minimum information guidelines for highly multiplexed tissue images. <i>Nature Methods</i> 2022;19:262–267. The specification is published at <a href="https://github.com/miti-consortium/MITI">github.com/miti-consortium/MITI</a> under the MIT License, © 2021 Laboratory of Systems Pharmacology @ Harvard. Fields marked “not in MITI” are not part of the guidelines but are routinely asked for in methods sections. This tool is independent and not endorsed by the MITI consortium.</p>
+        <p class="credits cite"><b>How to cite:</b> Pathare S. Methods Writer: methods and channel metadata for multiplex tissue imaging, organized by the MITI guidelines. Version 1.3, 2026. https://suyogpathare.com/methods/ <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a><br>Scientific design and validation by Suyog Pathare.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© <span id="yr"></span> Suyog Pathare</div>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    $("yr").textContent = new Date().getFullYear();
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    // [id, label, MITI attribute ("" = not in MITI), significance, suggestions, placeholder]
+    const SECTIONS = [
+      ["specimen", "Specimen and sectioning", [
+        ["species", "Species", "", "", ["Human", "Mouse", "Rat"], ""],
+        ["spType", "Specimen type", "Biospecimen Type", "required", ["Tissue", "Bone Marrow", "Cell Block", "Blood", "Fluids"], ""],
+        ["organ", "Tissue or organ", "", "", [], "e.g. tonsil, colon adenocarcinoma"],
+        ["acq", "How it was obtained", "Acquisition Method Type", "required", ["Autopsy", "Biopsy", "Fine needle aspirate", "Surgical Resection", "Punch biopsy", "Shave biopsy", "Excision", "Re-excision", "Sentinel node biopsy", "Lymphadenectomy"], ""],
+        ["pres", "Preservation", "Preservation method", "required", ["Formaldehyde fixed paraffin embedded (FFPE)", "Frozen"], ""],
+        ["fix", "Fixative", "Fixative Type", "required", [], "e.g. 10% neutral buffered formalin"],
+        ["fixDur", "Fixation time", "Fixation Duration", "required", [], "e.g. 24 h"],
+        ["storage", "Storage", "Storage Method", "required", ["Ambient temperature", "4C", "-20C", "-80C"], ""],
+        ["thick", "Section thickness (µm)", "Section Thickness Value", "required", [], "e.g. 4"],
+        ["slicing", "Sectioning method", "Slicing method", "recommended", ["Vibratome", "Cryosectioning", "Tissue molds", "Sliding microtome", "Sectioning"], ""],
+        ["slide", "Slide type", "Slide Charge Type", "required", ["Uncharged", "Charged", "Coverslip", "Coated", "Not applicable"], ""],
+      ]],
+      ["stain", "Staining", [
+        ["assay", "Assay", "Assay Type", "required", ["H&E", "t-CyCIF", "IHC", "mIHC", "MxIF", "SABER", "IMC", "CODEX", "MIBI"], "e.g. t-CyCIF"],
+        ["protocol", "Protocol DOI", "Protocol Id(S)", "required", [], "e.g. protocols.io DOI"],
+        ["dewax", "Deparaffinization", "", "", [], "e.g. xylene and graded ethanol"],
+        ["retrieval", "Antigen retrieval", "", "", [], "e.g. Tris-EDTA pH 9, 20 min at 97 °C"],
+        ["blocking", "Blocking", "", "", [], "e.g. 2% BSA in PBS, 1 h"],
+        ["incub", "Antibody incubation", "", "", [], "e.g. overnight at 4 °C"],
+        ["inact", "Signal removal between cycles", "", "", [], "e.g. bleaching in H2O2 under light"],
+        ["mounting", "Mounting medium", "Mounting medium", "recommended", ["Aqueous (water based) medium", "Non-Aqueous (Solvent) based", "Xylene", "Toluene", "Antifade with DAPI", "Antifade without DAPI", "PBS"], ""],
+        ["fiducial", "Alignment marker across cycles", "Fiducial marker", "required", ["Nuclear Stain (DAPI)", "Fluorescent beads", "Grid slides (hemocytometer)", "Adhesive markers"], ""],
+      ]],
+      ["img", "Imaging", [
+        ["modality", "Imaging modality", "Imaging modality", "required", ["epifluorescence", "lightsheet", "confocal", "ion beam", "laser ablation"], ""],
+        ["microscope", "Microscope", "Microscope", "recommended", [], "manufacturer and model"],
+        ["objective", "Objective", "Objective", "recommended", [], "e.g. Plan Apo 20x"],
+        ["mag", "Magnification", "Nominal Magnification", "recommended", ["10X", "20X", "40X"], ""],
+        ["na", "Numerical aperture", "Lens NA", "recommended", [], "e.g. 0.75"],
+        ["immersion", "Immersion", "Immersion Medium", "recommended", ["Air", "Water", "Glycerin", "Oil"], ""],
+        ["pixel", "Pixel size (µm)", "PhysicalSizeX", "required", [], "e.g. 0.325"],
+        ["avg", "Frames averaged", "Frame_ Averaging", "recommended", [], "1 if none"],
+        ["zstack", "Z-stack", "Z_Stack", "required", ["No", "Yes"], ""],
+        ["acqsw", "Acquisition software", "Acquisition software", "recommended", [], "name and version"],
+        ["format", "File format", "File Format", "required", ["OME-TIFF", "SVS", "CZI"], ""],
+        ["pyramid", "Pyramidal file", "Pyramid", "required", ["Yes", "No"], ""],
+      ]],
+      ["proc", "Image processing", [
+        ["illum", "Illumination correction", "", "", [], "e.g. BaSiC"],
+        ["stitch", "Stitching and registration", "", "", [], "e.g. ASHLAR"],
+        ["seg", "Segmentation", "", "", [], "method or model, e.g. Mesmer"],
+        ["obj", "Segmented objects", "Object class", "required", ["nuclei", "cytoplasm", "cell", "plasma membrane", "other"], ""],
+        ["quant", "Quantification", "", "", [], "e.g. mean intensity per cell"],
+        ["sw", "Software and versions", "Software and Version", "required", [], "e.g. MCMICRO, with versions"],
+        ["sha", "Commit SHA", "Commit SHA", "required", [], "8 characters, for code from GitHub"],
+      ]],
+      ["data", "Data availability", [
+        ["repo", "Repository", "", "", [], "e.g. BioImage Archive, Synapse, Zenodo"],
+        ["acc", "Accession or DOI", "", "", [], ""],
+      ]],
+    ];
+    const FIELD = Object.fromEntries(SECTIONS.flatMap(([, , fs]) => fs.map((f) => [f[0], f])));
+
+    // [key, column, MITI attribute, significance, width class]
+    const COLS = [
+      ["cycle", "Cycle", "Cycle Number", "recommended", "c-s"],
+      ["chan", "Channel name", "Channel Name", "required", "c-m"],
+      ["target", "Target", "Target name", "required", "c-m"],
+      ["name", "Antibody name", "Antibody Name", "required", "c-l"],
+      ["clone", "Clone", "Clone", "required", "c-m"],
+      ["vendor", "Vendor", "Vendor", "required", "c-l"],
+      ["cat", "Cat. #", "Catalog #", "required", "c-m"],
+      ["lot", "Lot", "Lot", "required", "c-m"],
+      ["rrid", "RRID", "RRID identifier", "required", "c-l"],
+      ["label", "Label", "Fluorophore", "required", "c-m"],
+      ["dil", "Dilution", "Dilution", "recommended", "c-m"],
+      ["qc", "Passed QC", "Passed QC", "recommended", "c-s"],
+      ["qcn", "QC note", "QC details", "recommended", "c-l"],
+    ];
+    const NOT_AB = /^(dapi|hoechst|draq5|sytox|ir\s?\d*\s*intercalator|intercalator)/i;
+
+    const KEY = "methods-writer-v1";
+    let S = { f: {}, abs: [] };
+    const cap = (v) => String(v ?? "").slice(0, 500);
+    function adopt(j) {
+      const f = {}, abs = [];
+      if (j && typeof j.f === "object" && j.f) for (const k of Object.keys(FIELD)) if (j.f[k] != null) f[k] = cap(j.f[k]);
+      if (j && Array.isArray(j.abs)) for (const r of j.abs.slice(0, 200)) {
+        if (!r || typeof r !== "object") continue;
+        const o = {}; for (const [k] of COLS) o[k] = cap(r[k]); abs.push(o);
+      }
+      return { f, abs };
+    }
+    try { S = adopt(JSON.parse(localStorage.getItem(KEY) || "{}")); } catch {}
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+    const v = (k) => (S.f[k] || "").trim();
+
+    // ---------- Form ----------
+    const tag = (miti, sig) => miti
+      ? `<span class="tagm${sig === "required" ? " req" : ""}" title="MITI attribute: ${esc(miti)}">MITI · ${esc(sig)}</span>`
+      : `<span class="tagm">not in MITI</span>`;
+    function drawForm() {
+      $("sections").innerHTML = SECTIONS.map(([sid, title, fs]) => `
+        <details class="panel" open><summary>${esc(title)}</summary><div class="grid">
+          ${fs.map(([id, label, miti, sig, opts, ph]) => `
+            <label class="fld"><span class="lab">${esc(label)}${tag(miti, sig)}</span>
+              <input type="text" data-f="${id}" value="${esc(S.f[id] || "")}" placeholder="${esc(ph)}"${opts.length ? ` list="dl-${id}"` : ""}>
+              ${opts.length ? `<datalist id="dl-${id}">${opts.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : ""}
+            </label>`).join("")}
+        </div></details>`).join("");
+    }
+    $("sections").addEventListener("input", (e) => {
+      const k = e.target.dataset.f; if (!k) return;
+      S.f[k] = cap(e.target.value); save(); drawOut();
+    });
+
+    $("abs-head").innerHTML = COLS.map(([, col, miti, sig]) =>
+      `<th title="MITI attribute: ${esc(miti)} (${esc(sig)})">${esc(col)}${sig === "required" ? " *" : ""}</th>`).join("") + "<th></th>";
+    function drawAbs() {
+      $("abs-rows").innerHTML = S.abs.map((r, i) => `<tr>${COLS.map(([k, col, , , w]) =>
+        `<td class="${w}"><input type="text" data-r="${i}" data-k="${k}" value="${esc(r[k])}" aria-label="${esc(col)}, row ${i + 1}"${k === "qc" ? ' list="dl-qc"' : ""}></td>`).join("")}
+        <td class="del"><button type="button" data-del="${i}" aria-label="Remove row ${i + 1}">×</button></td></tr>`).join("")
+        + `<datalist id="dl-qc"><option value="Yes"><option value="No"></datalist>`;
+      $("abs-count").textContent = S.abs.length ? `${S.abs.length} channel${S.abs.length === 1 ? "" : "s"}` : "";
+    }
+    $("abs-rows").addEventListener("input", (e) => {
+      const i = +e.target.dataset.r, k = e.target.dataset.k;
+      if (!S.abs[i] || !k) return;
+      S.abs[i][k] = cap(e.target.value); save(); drawOut();
+    });
+    $("abs-rows").addEventListener("click", (e) => {
+      const i = e.target.dataset.del; if (i == null) return;
+      S.abs.splice(+i, 1); save(); drawAbs(); drawOut();
+    });
+    const blankRow = () => Object.fromEntries(COLS.map(([k]) => [k, ""]));
+    $("abs-add").addEventListener("click", () => { S.abs.push(blankRow()); save(); drawAbs(); drawOut(); });
+
+    function flash(id, msg) { $(id).textContent = msg; clearTimeout(flash[id]); flash[id] = setTimeout(() => { $(id).textContent = ""; }, 5000); }
+
+    // AbScout runs on the same site, so its saved panel and validation record are readable here.
+    $("abs-import").addEventListener("click", () => {
+      let panel = [], vr = {};
+      try { panel = JSON.parse(localStorage.getItem("antibody-panel-v1") || "[]"); } catch {}
+      try { vr = (JSON.parse(localStorage.getItem("abscout-validation-v1") || "{}") || {}).abs || {}; } catch {}
+      if (!Array.isArray(panel) || !panel.length) { flash("abs-flash", "No AbScout panel is saved in this browser. Add antibodies to the panel in AbScout first."); return; }
+      let added = 0;
+      for (const x of panel) {
+        if (!x || !x.rrid || S.abs.some((r) => r.rrid === x.rrid)) continue;
+        const rec = vr[x.rrid] || {};
+        const t = cap(x.gene || x.target).slice(0, 40);
+        const conj = String(x.conjugate || "").split(";").pop().trim();
+        S.abs.push({ ...blankRow(), chan: t, target: t, name: cap(x.target).slice(0, 80), clone: cap(x.clone), vendor: cap(x.vendor),
+          cat: cap(x.catalog), lot: cap(rec.lot), rrid: cap(x.rrid), label: /^unconj|^none$|purified/i.test(conj) ? "" : cap(conj), dil: cap(rec.dilution) });
+        added++;
+      }
+      save(); drawAbs(); drawOut();
+      flash("abs-flash", added ? `Imported ${added} antibod${added === 1 ? "y" : "ies"} from AbScout. Add cycles, channel names, labels for unconjugated antibodies, and the nuclear stain.` : "Every antibody in the AbScout panel is already here.");
+    });
+
+    // ---------- Text ----------
+    const list = (a) => a.length <= 1 ? (a[0] || "") : a.length === 2 ? `${a[0]} and ${a[1]}` : `${a.slice(0, -1).join(", ")}, and ${a[a.length - 1]}`;
+    const sent = (s) => { s = s.trim(); if (!s) return ""; s = s[0].toUpperCase() + s.slice(1); return /[.!?]$/.test(s) ? s : s + "."; };
+    const unit = (x, u) => /[a-zµ°%]/i.test(x) ? x : `${x} ${u}`;
+    const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+    const num = (n, mid) => n <= 10 ? (mid ? WORDS[n] : WORDS[n][0].toUpperCase() + WORDS[n].slice(1)) : String(n);
+    const rrid = (x) => { x = x.trim(); return !x ? "" : /^rrid:/i.test(x) ? "RRID:" + x.slice(5).trim() : "RRID:" + x; };
+    const isMetal = (l) => /^(\d{2,3})\s*([A-Z][a-z]?)$|^([A-Z][a-z]?)\s*-?\s*(\d{2,3})$/.exec(l.trim());
+
+    function abLine(r) {
+      const bits = [];
+      const src = [r.vendor, r.cat && `cat. ${r.cat}`].filter(Boolean).join(" ");
+      if (src) bits.push(src);
+      if (r.clone) bits.push(`clone ${r.clone}`);
+      if (r.lot) bits.push(`lot ${r.lot}`);
+      if (r.rrid) bits.push(rrid(r.rrid));
+      if (r.label && r.label.trim().toLowerCase() !== (r.target || r.name).trim().toLowerCase()) bits.push(r.label);
+      if (r.dil) bits.push(r.dil);
+      if (r.cycle) bits.push(`cycle ${r.cycle}`);
+      return `${r.target || r.name || "unnamed"}${bits.length ? ` (${bits.join("; ")})` : ""}`;
+    }
+
+    function text() {
+      const P = [];
+      // Specimen
+      let s = "";
+      const spec = [v("species"), v("organ") || (v("spType") && v("spType").toLowerCase())].filter(Boolean).join(" ");
+      if (spec || v("acq")) s += sent(`${spec ? spec + " specimens" : "Specimens"}${v("acq") ? ` were obtained by ${v("acq").toLowerCase()}` : " were used"}`);
+      const dur = v("fixDur") ? ` for ${v("fixDur")}` : "";
+      if (/ffpe|paraffin/i.test(v("pres"))) s += " " + sent(`Tissue was fixed in ${v("fix") || "formalin"}${dur} and embedded in paraffin`);
+      else if (/frozen/i.test(v("pres"))) s += " " + sent(`Tissue was frozen${v("fix") ? `; sections were fixed in ${v("fix")}${dur}` : ""}`);
+      else {
+        if (v("pres")) s += " " + sent(`Preservation: ${v("pres")}`);
+        if (v("fix")) s += " " + sent(`Tissue was fixed in ${v("fix")}${dur}`);
+      }
+      const STORE = { "ambient temperature": "at room temperature", "4c": "at 4 °C", "-20c": "at −20 °C", "-80c": "at −80 °C" };
+      if (v("storage")) s += " " + sent(`${/ffpe|paraffin/i.test(v("pres")) ? "Blocks" : "Specimens"} were stored ${STORE[v("storage").toLowerCase()] || v("storage")}`);
+      const CUT = { vibratome: "on a vibratome", cryosectioning: "on a cryostat", "sliding microtome": "on a sliding microtome", "tissue molds": "using tissue molds", sectioning: "" };
+      const how = v("slicing") ? (CUT[v("slicing").toLowerCase()] ?? `by ${v("slicing")}`) : "";
+      const slide = v("slide") && !/not applicable/i.test(v("slide")) ? `mounted on ${v("slide").toLowerCase()} slides` : "";
+      const cut = v("thick") || how ? `cut${v("thick") ? ` at ${unit(v("thick"), "µm")}` : ""}${how ? " " + how : ""}` : "";
+      if (cut || slide) s += " " + sent(`Sections were ${[cut, slide].filter(Boolean).join(" and ")}`);
+      if (s.trim()) P.push(s.trim());
+
+      // Staining
+      s = "";
+      const ab = S.abs.filter((r) => Object.values(r).some((x) => String(x).trim()));
+      const cycles = new Set(ab.map((r) => r.cycle.trim()).filter(Boolean));
+      if (v("assay")) s += sent(`Multiplex staining was performed by ${v("assay")}${v("protocol") ? ` following the published protocol (${v("protocol")})` : ""}`);
+      else if (v("protocol")) s += sent(`Staining followed the published protocol (${v("protocol")})`);
+      if (v("dewax")) s += " " + sent(`Sections were deparaffinized in ${v("dewax")}`);
+      if (v("retrieval")) s += " " + sent(`Antigen retrieval: ${v("retrieval")}`);
+      if (v("blocking")) s += " " + sent(`Sections were blocked with ${v("blocking")}`);
+      const abs = ab.filter((r) => !NOT_AB.test(r.target || r.name || r.chan));
+      if (abs.length) s += " " + sent(`${num(abs.length)} antibod${abs.length === 1 ? "y was" : "ies were"} applied${cycles.size > 1 ? ` over ${num(cycles.size, true)} cycles` : ""}${v("incub") ? `, ${v("incub")}` : ""} (listed below)`);
+      else if (v("incub")) s += " " + sent(`Antibodies were incubated ${v("incub")}`);
+      if (v("inact") && cycles.size > 1) s += " " + sent(`Signal was removed between cycles by ${v("inact")}`);
+      else if (v("inact")) s += " " + sent(`Signal removal between cycles: ${v("inact")}`);
+      const nuc = ab.filter((r) => NOT_AB.test(r.target || r.name || r.chan));
+      if (nuc.length) s += " " + sent(`Nuclei were stained with ${list(nuc.map(abLine))}`);
+      const MOUNT = { "aqueous (water based) medium": "aqueous mounting medium", "non-aqueous (solvent) based": "solvent-based mounting medium",
+        xylene: "xylene-based mounting medium", toluene: "toluene-based mounting medium", "antifade with dapi": "antifade mounting medium containing DAPI",
+        "antifade without dapi": "antifade mounting medium without DAPI", pbs: "PBS" };
+      if (v("mounting")) s += " " + sent(`Slides were mounted in ${MOUNT[v("mounting").toLowerCase()] || v("mounting")}`);
+      if (v("fiducial")) s += " " + sent(`${v("fiducial").replace(/^Nuclear Stain \(DAPI\)/, "The DAPI nuclear stain")} was used to align images across cycles`);
+      if (s.trim()) P.push(s.trim());
+
+      // Imaging
+      s = "";
+      const obj = [v("objective"), v("mag") && !v("objective").toLowerCase().includes(v("mag").toLowerCase().replace("x", "")) ? v("mag").toLowerCase() : ""].filter(Boolean).join(" ");
+      const optics = [v("na") && `NA ${v("na")}`, v("immersion") && `${v("immersion").toLowerCase()} immersion`].filter(Boolean).join(", ");
+      if (v("microscope") || obj || v("modality")) {
+        s += sent(`Images were acquired${v("modality") ? ` by ${v("modality")} microscopy` : ""}${v("microscope") ? ` on a ${v("microscope")}` : ""}${obj ? ` with a ${obj} objective${optics ? ` (${optics})` : ""}` : optics ? ` (${optics})` : ""}`);
+      }
+      if (v("pixel")) s += " " + sent(`The pixel size was ${unit(v("pixel"), "µm")}`);
+      if (v("avg")) s += " " + sent(v("avg") === "1" ? "No frame averaging was used" : `${/^\d+$/.test(v("avg")) ? num(+v("avg")) : v("avg")} frames were averaged per image`);
+      if (/^y/i.test(v("zstack"))) s += " Z-stacks were acquired.";
+      if (v("acqsw")) s += " " + sent(`Acquisition used ${v("acqsw")}`);
+      if (v("format")) s += " " + sent(`Images were saved as ${/^y/i.test(v("pyramid")) ? "pyramidal " : ""}${v("format")} files`);
+      if (s.trim()) P.push(s.trim());
+
+      // Processing
+      s = "";
+      const steps = [
+        v("illum") && `illumination correction (${v("illum")})`,
+        v("stitch") && `stitching and registration (${v("stitch")})`,
+        (v("seg") || v("obj")) && `segmentation${v("obj") ? ` of ${v("obj").toLowerCase().replace(/^cell$/, "whole cells")}` : ""}${v("seg") ? ` (${v("seg")})` : ""}`,
+        v("quant") && `quantification (${v("quant")})`,
+      ].filter(Boolean);
+      if (steps.length) s += sent(`Image processing comprised ${list(steps)}`);
+      if (v("sw")) s += " " + sent(`Software: ${v("sw")}${v("sha") ? ` (commit ${v("sha")})` : ""}`);
+      else if (v("sha")) s += " " + sent(`Code version: commit ${v("sha")}`);
+      if (s.trim()) P.push(s.trim());
+
+      // Antibodies
+      if (abs.length) P.push("Antibodies: " + abs.map(abLine).join("; ") + ".");
+      const failed = ab.filter((r) => /^n/i.test(r.qc.trim()));
+      if (failed.length) P.push(sent(`Channels that did not pass quality control but are included in the data: ${list(failed.map((r) => `${r.chan || r.target}${r.qcn ? ` (${r.qcn})` : ""}`))}`));
+
+      // Data
+      s = "";
+      if (v("repo") || v("acc")) s += sent(`Images${ab.length ? " and channel metadata" : ""} are available${v("repo") ? ` from ${v("repo")}` : ""}${v("acc") ? ` (${v("acc")})` : ""}`);
+      if (P.length || s) s += (s ? " " : "") + "Metadata are reported following the MITI guidelines (Schapiro et al., Nature Methods 2022).";
+      if (s.trim()) P.push(s.trim());
+      return P.join("\n\n");
+    }
+
+    function missing() {
+      const out = [];
+      for (const [, title, fs] of SECTIONS) {
+        const m = fs.filter(([id, , miti]) => miti && !v(id)).map(([, label, , sig]) => `${label}${sig === "required" ? "" : " (recommended)"}`);
+        if (m.length) out.push(`${title}: ${m.join(", ")}`);
+      }
+      const ab = S.abs.filter((r) => Object.values(r).some((x) => String(x).trim()));
+      if (!ab.length) out.push("Antibodies and channels: no rows yet");
+      ab.forEach((r, i) => {
+        const req = COLS.filter(([k, , , sig]) => sig === "required" && !r[k].trim()
+          && !(NOT_AB.test(r.target || r.name || r.chan) && ["name", "clone", "rrid"].includes(k)));
+        if (req.length) out.push(`Row ${i + 1} (${r.chan || r.target || "unnamed"}): ${req.map(([, col]) => col.toLowerCase()).join(", ")}`);
+      });
+      return out;
+    }
+
+    function drawOut() {
+      $("out").value = text();
+      const m = missing();
+      $("check").innerHTML = m.length ? m.map((x) => `<li class="miss">${esc(x)}</li>`).join("") : "<li>None of the fields on this page are empty.</li>";
+    }
+
+    // ---------- Exports ----------
+    function download(name, type, body) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([body], { type }));
+      a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    const csvCell = (x) => { x = String(x ?? ""); if (/^[=+\-@]/.test(x)) x = "'" + x; return /[",\n\r]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+    $("csv").addEventListener("click", () => {
+      const head = ["Channel ID", "Channel Name", "Cycle Number", "Target name", "Antibody Name", "RRID identifier", "Fluorophore",
+        "Metal isotope: Element", "Metal isotope: Mass", "Clone", "Lot", "Vendor", "Catalog #", "Dilution", "Passed QC", "QC details"];
+      const rows = S.abs.filter((r) => Object.values(r).some((x) => String(x).trim())).map((r, i) => {
+        const m = isMetal(r.label || "");
+        const el = m ? (m[2] || m[3]) : "", mass = m ? (m[1] || m[4]) : "";
+        const qc = /^y/i.test(r.qc) ? "TRUE" : /^n/i.test(r.qc) ? "FALSE" : "";
+        return [`Channel:0:${i}`, r.chan || r.target, r.cycle, r.target, r.name, r.rrid ? rrid(r.rrid) : "", m ? "" : r.label, el, mass,
+          r.clone, r.lot, r.vendor, r.cat, r.dil, qc, r.qcn];
+      });
+      if (!rows.length) { flash("flash", "Add at least one channel first."); return; }
+      download("channel-metadata.csv", "text/csv", [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n");
+      flash("flash", "Channel IDs are numbered in row order (Channel:0:0, Channel:0:1, …). Check that they match the channel IDs in your image file.");
+    });
+    $("json").addEventListener("click", () => {
+      download("methods-record.json", "application/json", JSON.stringify({ format: "methods-writer", version: 1, saved: new Date().toISOString().slice(0, 10), ...S }, null, 2));
+    });
+    $("file").addEventListener("change", async (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      try {
+        const j = JSON.parse(await f.text());
+        if (!j || j.format !== "methods-writer") throw new Error();
+        S = adopt(j); save(); drawForm(); drawAbs(); drawOut();
+        flash("flash", "Loaded.");
+      } catch { flash("flash", "That file is not a Methods Writer JSON record."); }
+    });
+    $("copy").addEventListener("click", async () => {
+      const t = $("out").value;
+      try { await navigator.clipboard.writeText(t); }
+      catch { $("out").select(); document.execCommand("copy"); }
+      flash("flash", "Copied.");
+    });
+    $("clear").addEventListener("click", () => {
+      if (!confirm("Clear every field and channel on this page?")) return;
+      S = { f: {}, abs: [] }; save(); drawForm(); drawAbs(); drawOut();
+    });
+    $("print").addEventListener("click", () => {
+      const ab = S.abs.filter((r) => Object.values(r).some((x) => String(x).trim()));
+      const w = window.open("", "_blank");
+      if (!w) { flash("flash", "Allow pop-ups for this site to print."); return; }
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Methods</title><style>
+        body{font:13px/1.5 -apple-system,Helvetica,Arial,sans-serif;margin:32px;color:#111}h1{font-size:18px}p{white-space:pre-wrap}
+        table{border-collapse:collapse;width:100%;font-size:11px;margin-top:16px}th,td{border:1px solid #ccc;padding:4px;text-align:left;vertical-align:top}
+        .fine{color:#666;font-size:11px;margin-top:20px}</style></head><body><h1>Methods</h1>
+        ${text().split("\n\n").map((p) => `<p>${esc(p)}</p>`).join("")}
+        ${ab.length ? `<table><tr>${COLS.map(([, c]) => `<th>${esc(c)}</th>`).join("")}</tr>${ab.map((r) => `<tr>${COLS.map(([k]) => `<td>${esc(r[k])}</td>`).join("")}</tr>`).join("")}</table>` : ""}
+        <p class="fine">Generated with Methods Writer (suyogpathare.com/methods/) from the values entered; fields follow the MITI guidelines (Schapiro et al., Nature Methods 2022).</p>
+        </body></html>`);
+      w.document.close(); w.focus(); w.print();
+    });
+
+    drawForm(); drawAbs(); drawOut();
+  </script>
+</body>
+</html>
