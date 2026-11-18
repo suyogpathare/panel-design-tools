@@ -8,3 +8,4 @@ public/data/genes-*.json
 public/data/ko.json
 public/data/dyes.json
 __pycache__/
+.dev.vars
