@@ -16,7 +16,12 @@ Scientific design and validation by Suyog Pathare.
   IMC/MIBI), flags host and fluorophore clashes and antibodies that failed a
   knockout test, assigns the brightest channels to the targets with the lowest
   RNA in the chosen tissue (Human Protein Atlas), and estimates bleed-through
-  between dyes imaged together from FPbase spectra.
+  between dyes imaged together from FPbase spectra. A validation record keeps
+  the specificity evidence for each panel antibody under the five strategies
+  of the International Working Group for Antibody Validation (Uhlén et al.,
+  Nature Methods 2016), adds published knockout and OMAP records, and drafts
+  text for the authentication of key resources in grant applications. It
+  records what the user enters and never declares an antibody validated.
 - **[PanelScout](https://suyogpathare.com/panelscout/)**: paste a gene list and
   see how much of it each imaging spatial transcriptomics panel covers. It
   hosts no vendor panel lists: you download the panel files from the vendors

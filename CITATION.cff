@@ -6,8 +6,8 @@ authors:
   - family-names: Pathare
     given-names: Suyog
     orcid: "https://orcid.org/0000-0001-8856-3796"
-version: 1.1.0
-date-released: 2026-11-17
+version: 1.2.0
+date-released: 2026-11-18
 license: MIT
 repository-code: "https://github.com/suyogpathare/panel-design-tools"
 doi: 10.5281/zenodo.24326636
@@ -17,7 +17,8 @@ abstract: >-
   use in HuBMAP Organ Mapping Antibody Panels, citations and reactivity, and
   builds multiplex imaging panels with host, fluorophore, knockout-validation
   (YCharOS) and spectral bleed-through (FPbase) checks, informed by Human
-  Protein Atlas tissue RNA levels. PanelScout reports how much of a gene list
+  Protein Atlas tissue RNA levels, and keeps a per-antibody validation
+  record under the five IWGAV strategies. PanelScout reports how much of a gene list
   each imaging spatial transcriptomics panel covers, from panel files the user
   loads from the vendors, resolving aliases through HGNC and MGI.
 keywords:
