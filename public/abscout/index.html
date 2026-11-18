@@ -86,6 +86,11 @@
     .clonebtn:hover { text-decoration: underline; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
     .tag.omap { color: var(--pill); border-color: color-mix(in srgb, var(--pill) 45%, transparent); cursor: help; }
+    a.tag.ko { color: var(--muted); text-decoration: none; }
+    a.tag.ko:hover { text-decoration: underline; }
+    a.tag.ko-ok { color: #1a7f37; border-color: color-mix(in srgb, #1a7f37 45%, transparent); }
+    a.tag.ko-bad { color: #c62828; border-color: color-mix(in srgb, #c62828 45%, transparent); }
+    @media (prefers-color-scheme: dark) { a.tag.ko-ok { color: #4ac26b; } a.tag.ko-bad { color: #ff7b72; } }
     .omaplist { margin: 16px 0 0; font-size: 14px; }
     .omaplist h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
     .omaplist li { margin: 3px 0; }
@@ -219,6 +224,7 @@
             <input id="f-text" type="text" placeholder="Filter vendor, clone, conjugate…" aria-label="Filter results">
             <label><input id="f-disc" type="checkbox"> Hide discontinued</label>
             <label title="Antibodies used in HuBMAP Organ Mapping Antibody Panels for multiplexed tissue imaging"><input id="f-omap" type="checkbox"> In OMAP panels</label>
+            <label title="Antibodies characterized against knockout cell lines by YCharOS"><input id="f-ko" type="checkbox"> Knockout-tested</label>
             <select id="f-more" aria-label="Load every product from one vendor" hidden></select>
             <span class="spacer"></span>
             <button class="linkbtn" type="button" id="csv">Download CSV</button>
@@ -271,9 +277,11 @@
           Gene names, synonyms and HPA antibody reliability: <a href="https://www.proteinatlas.org">Human Protein Atlas</a>, CC BY 4.0
           (Uhlén M et al., Tissue-based map of the human proteome, <i>Science</i> 2015).
           OMAP badges: antibodies used in the <a href="https://humanatlas.io/omap">HuBMAP Organ Mapping Antibody Panels</a> for multiplexed tissue imaging (Human Reference Atlas, CC BY 4.0), matched by RRID, or by clone and gene.
+          KO badges: knockout-based characterization by <a href="https://ycharos.com">YCharOS</a>, published by <a href="https://onlygoodantibodies.co.uk">Only Good Antibodies</a> (CC BY 4.0), matched by RRID, or by gene and clone for the same monoclonal sold under another catalog number. ✓ supportive, ~ limited support, ✗ not supportive, in IHC or else cell immunofluorescence; hover for western blot and IP. Coverage is still small: 166 proteins as of November 2026, mostly from neuroscience.
+          Bleed-through estimates: dye spectra from <a href="https://www.fpbase.org">FPbase</a> (CC BY-SA 4.0; Lambert TJ, <i>Nature Methods</i> 2019).
           This page lists what the public sources record; check validation data with the vendor before use.
         </p>
-        <p class="credits cite"><b>How to cite:</b> Pathare S. AbScout: antibody catalog search for multiplex tissue imaging. Version 1.0, 2026. https://suyogpathare.com/abscout/<span class="doi"> <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a></span><br>Scientific design and validation by Suyog Pathare.</p>
+        <p class="credits cite"><b>How to cite:</b> Pathare S. AbScout: antibody catalog search for multiplex tissue imaging. Version 1.1, 2026. https://suyogpathare.com/abscout/<span class="doi"> <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a></span><br>Scientific design and validation by Suyog Pathare.</p>
       </div>
     </section>
   </main>
@@ -311,6 +319,37 @@
       return [...new Set(ps)];
     }
     const omapTag = (ps) => ps.length ? `<span class="tag omap" title="Used in ${esc(panelText(ps))}">OMAP${ps.length > 1 ? " ×" + ps.length : ""}</span>` : "";
+    // Knockout characterization (YCharOS, via Only Good Antibodies), by RRID, or
+    // by gene + clone for a monoclonal sold under another catalog number or conjugate.
+    let ko = null;
+    const koByClone = new Map(); // "GENE|CLONE" -> rrid
+    const koReady = fetch("/data/ko.json").then((r) => r.json()).then((j) => {
+      ko = j;
+      for (const [rrid, x] of Object.entries(j.antibodies)) if (x.c) koByClone.set(`${x.g.toUpperCase()}|${normClone(x.c)}`, rrid);
+    }).catch(() => {});
+    const KO_APP = { WB: "western blot", IP: "immunoprecipitation", "ICC-IF": "immunofluorescence (cells)", IHC: "immunohistochemistry", FC: "flow cytometry" };
+    const KO_WORD = { s: "supportive", l: "limited support", n: "not supportive" };
+    function koFor(rrid, gene, clone) {
+      if (!ko) return null;
+      if (ko.antibodies[rrid]) return { rrid, how: "rrid", ...ko.antibodies[rrid] };
+      const k = gene && clone ? koByClone.get(`${gene.toUpperCase()}|${normClone(clone)}`) : null;
+      return k ? { rrid: k, how: "clone", ...ko.antibodies[k] } : null;
+    }
+    // Imaging-relevant result: IHC if tested, else immunofluorescence in cells.
+    const koImaging = (k) => (k && (k.r.IHC || k.r["ICC-IF"])) ? { app: k.r.IHC ? "IHC" : "ICC-IF", lv: (k.r.IHC || k.r["ICC-IF"])[0] } : null;
+    const koScore = (k) => { const m = koImaging(k); return !m ? 0 : m.lv === "s" ? 1 : m.lv === "l" ? 0.5 : -1; };
+    function koText(k) {
+      const parts = Object.entries(k.r).map(([a, [lv, q]]) => `${KO_APP[a] || a}: ${KO_WORD[lv]}${q ? ` (${q})` : ""}`);
+      return `Knockout-tested by YCharOS${k.how === "clone" ? ` as the same clone, ${k.rrid}` : ""}. ${parts.join("; ")}. Results hold for their protocols and cell lines; performance in tissue needs its own controls.`;
+    }
+    function koTag(k) {
+      if (!k) return "";
+      const m = koImaging(k);
+      const word = !m ? "KO-tested" : `KO ${m.app === "IHC" ? "IHC" : "IF"} ${m.lv === "s" ? "✓" : m.lv === "l" ? "~" : "✗"}`;
+      const cls = !m ? "" : m.lv === "s" ? " ko-ok" : m.lv === "n" ? " ko-bad" : "";
+      const page = ko.genes[k.g] ? ko.genes[k.g].page : "https://onlygoodantibodies.co.uk/";
+      return `<a class="tag ko${cls}" href="${esc(page)}" title="${esc(koText(k))}">${esc(word)}</a>`;
+    }
     // Panel: saved per browser; failures (private mode) just mean it is not remembered.
     const PANEL_KEY = "antibody-panel-v1";
     let panel = [];
@@ -369,6 +408,10 @@
       const byTarget = {};
       panel.forEach((x) => { const t = (x.gene || x.target).toUpperCase(); (byTarget[t] ||= []).push(x); });
       for (const [t, xs] of Object.entries(byTarget)) if (xs.length > 1) f.push(`${t} appears ${xs.length} times (clones: ${xs.map((x) => x.clone || "none listed").join(", ")}).`);
+      panel.forEach((x) => {
+        const k = koFor(x.rrid, x.rnaFrom ? "" : x.gene, x.clone), m = koImaging(k);
+        if (m && m.lv === "n") f.push(`${label(x)} (${x.vendor} ${x.catalog}${k.how === "clone" ? `, same clone as ${k.rrid}` : ""}) was not supportive in the YCharOS knockout test for ${m.app === "IHC" ? "IHC" : "immunofluorescence"}. Consider another clone, or validate it in your tissue with a knockout or knockdown control.`);
+      });
       panel.filter((x) => x.discontinued).forEach((x) => f.push(`${x.vendor} ${x.catalog} is marked discontinued in the registry.`));
       const unknownHost = panel.filter((x) => !x.host);
       if (unknownHost.length) f.push(`Host species not recorded for ${unknownHost.map((x) => `${x.vendor} ${x.catalog}`).join(", ")}; check the datasheet.`);
@@ -432,6 +475,65 @@
       return true;
     }
 
+    // Bleed-through estimate from FPbase spectra (dyes.json). Each channel is assumed to
+    // excite at its dye's excitation peak and collect from 10 nm below to 30 nm above
+    // its emission peak; your own lasers and filters decide the real numbers.
+    let dyes = null, dyeKeys = [];
+    const dyeKey = (v) => v.toLowerCase().replace(/alexa\s*fluor|alexa/g, "af").replace(/dylight/g, "dl").replace(/[^a-z0-9.]/g, "");
+    const dyesReady = fetch("/data/dyes.json").then((r) => r.json()).then((j) => {
+      dyes = j;
+      for (const [name, d] of Object.entries(j.dyes)) {
+        const short = name.replace(/\s*\(.*\)$/, "");
+        for (const a of new Set([name, short, ...d.a])) dyeKeys.push({ k: dyeKey(a), name });
+      }
+      dyeKeys.sort((a, b) => b.k.length - a.k.length);
+    }).catch(() => {});
+    // Conjugate text -> FPbase dye name; null if not recognised, "tandem" if two dyes are named.
+    function dyeOf(text) {
+      if (!dyes || !text) return null;
+      let rest = dyeKey(text);
+      const hits = new Set();
+      for (const d of dyeKeys) {
+        const i = rest.indexOf(d.k);
+        if (i < 0 || /\d/.test(rest[i + d.k.length] || "")) continue; // "af488" must not match "af4880"
+        hits.add(d.name);
+        rest = rest.slice(0, i) + "|" + rest.slice(i + d.k.length);
+      }
+      return hits.size === 1 ? [...hits][0] : hits.size > 1 ? "tandem" : null;
+    }
+    function bleed(from, into) {
+      const A = dyes.dyes[from], B = dyes.dyes[into];
+      const idx = (w) => Math.round((w - dyes.min) / dyes.step);
+      const band = (d) => [idx(Math.max(d.emPeak - 10, d.exPeak + 10)), idx(d.emPeak + 30)];
+      const sum = (arr, [lo, hi]) => arr.slice(Math.max(0, lo), hi + 1).reduce((a, v) => a + v, 0);
+      const own = A.ex[idx(A.exPeak)] * sum(A.em, band(A));
+      return own ? (100 * A.ex[idx(B.exPeak)] * sum(A.em, band(B))) / own : 0;
+    }
+    // Two dyes clash when either is expected to put 25% or more of its signal in the other's channel.
+    const clash = (a, b) => { const x = dyeOf(a), y = dyeOf(b); return !!(x && y && x !== "tandem" && y !== "tandem" && x !== y && (bleed(x, y) >= 25 || bleed(y, x) >= 25)); };
+    // Pairs of dyes imaged together with an estimated bleed-through of 10% or more, either way.
+    function spectralWarnings(groups, what, advice) {
+      if (!dyes) return [];
+      const out = [], seen = new Set(), tandem = new Set(), unknown = new Set();
+      const sh = (n) => n.replace(/\s*\(.*\)$/, "");
+      const pct = (v) => (v >= 90 ? "nearly all" : `about ${Math.round(v)}%`);
+      groups.forEach((g, gi) => {
+        const ds = [...new Set(g.map((t) => { const d = dyeOf(t); if (d === "tandem") tandem.add(t); else if (!d) unknown.add(t); return d; }).filter((d) => d && d !== "tandem"))];
+        for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
+          const [a, b] = [ds[i], ds[j]].sort(), ab = bleed(a, b), ba = bleed(b, a), key = `${a}|${b}`;
+          if (Math.max(ab, ba) < 10 || seen.has(key)) continue;
+          seen.add(key);
+          const where = `${what} ${gi + 1}`;
+          if (ab >= 90 && ba >= 90) { out.push(`${sh(a)} and ${sh(b)} are spectrally almost the same dye and cannot be told apart in one ${what} (${where}). ${advice}`); continue; }
+          const parts = [ab >= 10 ? `${pct(ab)} of ${sh(a)} signal in the ${sh(b)} channel` : "", ba >= 10 ? `${pct(ba)} of ${sh(b)} signal in the ${sh(a)} channel` : ""].filter(Boolean);
+          out.push(`${sh(a)} with ${sh(b)} (${where}): expect ${parts.join(", and ")}.${Math.max(ab, ba) >= 25 ? ` ${advice}` : ""}`);
+        }
+      });
+      if (tandem.size) out.push(`${[...tandem].join(", ")}: tandem dye${tandem.size > 1 ? "s are" : " is"} not modeled; check by hand.`);
+      if (unknown.size) out.push(`No spectrum on file for ${[...unknown].join(", ")}; check by hand.`);
+      return out;
+    }
+
     function renderPlan() {
       const el = $("pb-plan");
       lastPlan = new Map();
@@ -453,7 +555,8 @@
         if (lb === null) return -1;
         return la - lb;
       });
-      let rows = [], warn = [];
+      let rows = [], warn = [], spectral = [];
+      if (!dyes) dyesReady.then(() => { if (dyes && platform() === plat) renderPlan(); });
       if (plat === "indirect" && channels.length) {
         const rounds = [];
         for (const x of order) {
@@ -466,18 +569,21 @@
           const conj = !isUnconj(x.conjugate);
           rows.push({ x, round: ri + 1, channel: conj ? `${x.conjugate} (direct)` : `anti-${(x.host || "host").toLowerCase()} ${channels[ci]}` });
           lastPlan.set(x.rrid, { round: ri + 1, channel: conj ? x.conjugate : channels[ci] });
-          if (conj) warn.push(`${label(x)} is directly conjugated (${x.conjugate}); check that this does not clash with ${channels[ci]} in round ${ri + 1}.`);
+          if (conj && dyes && !dyeOf(x.conjugate)) warn.push(`${label(x)} is directly conjugated (${x.conjugate}); check that this does not clash with ${channels[ci]} in round ${ri + 1}.`);
         }));
+        spectral = spectralWarnings(rounds.map((rd) => rd.items.map((x, ci) => (isUnconj(x.conjugate) ? channels[ci] : x.conjugate))), "round",
+          "Swap one for a better-separated dye in the channel list, move a direct conjugate to its own round, or use spectral unmixing.");
       } else if (plat === "cyclic") {
         const cycles = [];
         for (const x of order) {
           const c = isUnconj(x.conjugate) ? "unconjugated" : x.conjugate.trim();
-          let cy = cycles.find((k) => !k.has(c) && k.size < Math.max(channels.length, 1));
+          let cy = cycles.find((k) => !k.has(c) && k.size < Math.max(channels.length, 1) && (c === "unconjugated" || ![...k].some((o) => o !== "unconjugated" && clash(o, c))));
           if (!cy) { cy = new Set(); cycles.push(cy); }
           cy.add(c);
           rows.push({ x, round: cycles.indexOf(cy) + 1, channel: c });
           lastPlan.set(x.rrid, { round: cycles.indexOf(cy) + 1, channel: c });
         }
+        spectral = spectralWarnings(cycles.map((cy) => [...cy].filter((c) => c !== "unconjugated")), "cycle", "Choose a better-separated conjugate for one of them, or use spectral unmixing.");
         if (pb.tissue) {
           const norm = (v) => v.toLowerCase().replace(/alexa\s*fluor|alexa/g, "af").replace(/[^a-z0-9]/g, "");
           const rank = (c) => { const i = channels.findIndex((ch) => norm(c).includes(norm(ch))); return i < 0 ? null : i; };
@@ -493,7 +599,7 @@
       el.innerHTML = `<div class="pb-plan">
         <h3>${plat === "cyclic" ? "Cycle plan" : "Channel plan"}</h3>
         <p class="note" style="margin-top:0">${plat === "cyclic"
-          ? "Antibodies are grouped so no two in one cycle share a fluorophore, lowest-expressed targets first. Pick a tissue to check that low-expressed targets sit on bright channels."
+          ? "Antibodies are grouped so no two in one cycle share a fluorophore or overlap strongly in spectrum, lowest-expressed targets first. Pick a tissue to check that low-expressed targets sit on bright channels."
           : "Targets with the lowest RNA in the chosen tissue get the brightest channels; unconjugated primaries that share a host species go in different rounds."}</p>
         <div class="pb-row" style="margin-top:6px">
           <label>Tissue <select id="pb-tissue"><option value="">Choose a tissue</option>${tOpts}</select></label>
@@ -505,6 +611,9 @@
           <tbody>${rows.sort((a, b) => a.round - b.round).map((r) => `<tr><td>${r.round}</td><td>${esc(r.channel)}</td><td>${esc(label(r.x))}</td><td class="num">${lvl(r.x) === null ? "—" : lvl(r.x).toLocaleString(undefined, { maximumFractionDigits: 1 })}${r.x.rnaFrom ? `<span class="sub">from ${esc(r.x.rnaFrom)}</span>` : ""}</td></tr>`).join("")}</tbody>
         </table></div>
         ${warn.length ? `<ul class="flags">${warn.map((w) => `<li class="warn">${esc(w)}</li>`).join("")}</ul>` : ""}
+        <h3 style="margin-top:18px">Bleed-through (estimate)</h3>
+        ${!dyes ? `<p class="note">Loading spectra…</p>` : spectral.length ? `<ul class="flags">${spectral.map((w) => `<li class="warn">${esc(w)}</li>`).join("")}</ul>` : `<p class="note">No pair of dyes imaged together is expected to bleed 10% or more into another's channel.</p>`}
+        <p class="note">Estimated from <a href="https://www.fpbase.org">FPbase</a> spectra (CC BY-SA 4.0) for equal labeling, with each channel excited at its dye's peak and collecting from 10 nm below to 30 nm above its emission peak. Your lasers, filters and target abundance change the real numbers; check with single-stain controls. <a href="https://www.fpbase.org/spectra/">FPbase spectra viewer</a></p>
         <p class="note">Expression is normal-tissue RNA from the Human Protein Atlas consensus data. RNA is a rough guide to protein abundance and says nothing about disease tissue; titrate each antibody before fixing the plan.</p>
       </div>`;
     }
@@ -531,13 +640,18 @@
       const omapC = new Set(gene ? (omapByGene.get(gene.symbol) || []).map((x) => normClone(x.clone)).filter(Boolean) : []);
       const omapUse = (i) => (omap && omap.antibodies[i.rrid]) || (cloneKey(i) && omapC.has(cloneKey(i))) ? 1 : 0;
       const mono = (i) => (/monoclonal|recombinant/i.test(i.clonality) ? 1 : 0);
+      const kof = (i) => koFor(i.rrid, gene && gene.symbol, cloneKey(i));
       return items.filter((i) => !i.discontinued && fit(i, plat) > 0 && reactFit(i, sp) > 0 && !KIT.test(`${i.name} ${i.target}`))
-        .map((i) => ({ i, omap: sp === "Human" ? omapUse(i) : 0, react: reactFit(i, sp), fit: fit(i, plat), mono: mono(i) }))
-        .sort((a, b) => b.fit - a.fit || b.omap - a.omap || (b.i.citations * b.react) - (a.i.citations * a.react) || b.mono - a.mono);
+        .map((i) => { const k = kof(i); return { i, k, ko: koScore(k), omap: sp === "Human" ? omapUse(i) : 0, react: reactFit(i, sp), fit: fit(i, plat), mono: mono(i) }; })
+        // Tissue-imaging evidence: OMAP use plus knockout result in IHC/IF (a failed knockout test counts against).
+        .sort((a, b) => b.fit - a.fit || (b.omap + b.ko) - (a.omap + a.ko) || (b.i.citations * b.react) - (a.i.citations * a.react) || b.mono - a.mono);
     }
     function why(c, plat) {
       const bits = [];
       if (c.omap) bits.push("used in a HuBMAP OMAP panel");
+      const km = koImaging(c.k);
+      if (km) bits.push(`knockout test${c.k.how === "clone" ? " (same clone)" : ""} in ${km.app === "IHC" ? "IHC" : "cell IF"}: ${KO_WORD[km.lv]}`);
+      else if (c.k) bits.push("knockout-tested, not in IF or IHC");
       bits.push(c.react === 2 ? `${pb.species} reactivity recorded` : "reactivity not recorded; check the datasheet");
       bits.push(`${c.i.citations.toLocaleString()} registry citation${c.i.citations === 1 ? "" : "s"}`);
       bits.push(isUnconj(c.i.conjugate) ? "unconjugated" : c.i.conjugate);
@@ -554,7 +668,7 @@
       const GENE_FOR = { CD3: "CD3E", PANCK: "KRT8", "PAN-CK": "KRT8", PANCYTOKERATIN: "KRT8" };
       if (!targets.length) { $("pb-status").textContent = "Enter at least one target."; return; }
       const plat = platform();
-      await omapReady;
+      await omapReady; await koReady;
       suggestions = targets.map((t) => ({ t, state: "loading" }));
       drawSuggestions();
       let done = 0;
@@ -576,14 +690,14 @@
           // Indirect IF: prefer a different host species when a close alternative exists.
           if (plat === "indirect" && sg.cands.length > 1) {
             const top = sg.cands[0];
-            const alt = sg.cands.findIndex((c) => isUnconj(c.i.conjugate) && !hostsUsed.has(c.i.host) && c.omap >= top.omap && c.i.citations >= top.i.citations * 0.25);
+            const alt = sg.cands.findIndex((c) => isUnconj(c.i.conjugate) && !hostsUsed.has(c.i.host) && c.omap + c.ko >= top.omap + top.ko && c.i.citations >= top.i.citations * 0.25);
             if (alt > 0 && hostsUsed.has(top.i.host)) { sg.pick = alt; sg.note = `chosen over the most cited (${top.i.host}) to avoid a shared host species`; }
           }
           // Cyclic IF: prefer a fluorophore not already used when a comparable option exists.
           if (plat === "cyclic" && sg.cands.length > 1) {
             const top = sg.cands[0];
             if (fluorsUsed.has(top.i.conjugate)) {
-              const alt = sg.cands.findIndex((c) => c.fit === top.fit && c.omap >= top.omap && !fluorsUsed.has(c.i.conjugate) && c.i.citations >= top.i.citations * 0.25);
+              const alt = sg.cands.findIndex((c) => c.fit === top.fit && c.omap + c.ko >= top.omap + top.ko && !fluorsUsed.has(c.i.conjugate) && c.i.citations >= top.i.citations * 0.25);
               if (alt > 0) { sg.pick = alt; sg.note = `chosen over ${top.i.conjugate}, which another target already uses`; }
             }
           }
@@ -707,7 +821,7 @@
           if (id !== searchId) return;
           const have = new Set(data.items.map((i) => i.rrid));
           const add = body.items.filter((i) => !have.has(i.rrid));
-          add.forEach((i) => { i.omap = omapPanelsForItem(i); });
+          add.forEach((i) => { i.omap = omapPanelsForItem(i); i.ko = koFor(i.rrid, data.gene && data.gene.symbol, cloneKey(i)); });
           if (add.length) { data.items = data.items.concat(add).sort((a, b) => b.citations - a.citations); dirty = true; }
         } catch {
           failed++;
@@ -749,9 +863,9 @@
       }
       if (id !== searchId) return;
       data = body;
-      await omapReady;
+      await omapReady; await koReady;
       omapClones = new Set(data.gene && omap ? (omapByGene.get(data.gene.symbol) || []).map((x) => normClone(x.clone)).filter(Boolean) : []);
-      data.items.forEach((i) => { i.omap = omapPanelsForItem(i); });
+      data.items.forEach((i) => { i.omap = omapPanelsForItem(i); i.ko = koFor(i.rrid, data.gene && data.gene.symbol, cloneKey(i)); });
       renderGene();
       buildFilters();
       shown = PAGE; gShown = GPAGE; cloneFilter = null;
@@ -780,11 +894,22 @@
             <dt>HPA antibodies</dt><dd>${esc(abs)}</dd>
             ${g.hpa_ihc_reliability ? `<dt>HPA IHC reliability</dt><dd>${esc(g.hpa_ihc_reliability)}</dd>` : ""}
             ${g.hpa_url ? `<dt>Protein Atlas</dt><dd><a class="link-chevron" href="${esc(g.hpa_url)}/antibody">Staining and validation</a></dd>` : ""}
-            <dt>RNA panels</dt><dd><a class="link-chevron" href="/panelscout/#human:${encodeURIComponent(g.symbol)}">Xenium and CosMx coverage in PanelScout</a></dd>
+            ${koGeneRow(g)}
+            <dt>Spatial panels</dt><dd><a class="link-chevron" href="/panelscout/#human:${encodeURIComponent(g.symbol)}">Check RNA panel coverage in PanelScout</a></dd>
           </dl>
           ${omapBlock(g)}
           ${tissueBlock(g)}
         </div>`;
+    }
+
+    function koGeneRow(g) {
+      const kg = ko && ko.genes[g.symbol];
+      if (!kg) return "";
+      const list = Object.values(ko.antibodies).filter((x) => x.g === g.symbol);
+      const img = list.map(koImaging).filter(Boolean);
+      const good = img.filter((m) => m.lv === "s").length;
+      const sum = `${list.length} antibod${list.length === 1 ? "y" : "ies"} tested${img.length ? `; ${good} of ${img.length} tested in IF/IHC supportive` : ""}`;
+      return `<dt>Knockout data</dt><dd>${esc(sum)} · <a class="link-chevron" href="${esc(kg.page)}">YCharOS results</a>${kg.report ? ` · <a href="${esc(kg.report)}">report</a>` : ""}</dd>`;
     }
 
     function omapBlock(g) {
@@ -859,7 +984,7 @@
         if (!data || data.query !== q) return;
         const have = new Set(data.items.map((i) => i.rrid));
         const add = body.items.filter((i) => !have.has(i.rrid));
-        add.forEach((i) => { i.omap = omapPanelsForItem(i); });
+        add.forEach((i) => { i.omap = omapPanelsForItem(i); i.ko = koFor(i.rrid, data.gene && data.gene.symbol, cloneKey(i)); });
         data.items = data.items.concat(add).sort((a, b) => b.citations - a.citations);
         loadedVendors.add(v);
         buildFilters();
@@ -881,6 +1006,7 @@
       const text = $("f-text").value.trim().toLowerCase();
       const hideDisc = $("f-disc").checked;
       const onlyOmap = $("f-omap").checked;
+      const onlyKo = $("f-ko").checked;
       let rows = data.items.filter((i) =>
         (!cl || i.clonality === cl) &&
         (!host || i.host === host) &&
@@ -889,6 +1015,7 @@
         (!hideDisc || !i.discontinued) &&
         (!cloneFilter || cloneKey(i) === cloneFilter) &&
         (!onlyOmap || i.omap.length) &&
+        (!onlyKo || i.ko) &&
         (!text || [i.vendor, i.catalog, i.clone, i.conjugate, i.target, i.name].join(" ").toLowerCase().includes(text))
       );
       rows.sort((a, b) => {
@@ -938,7 +1065,7 @@
           <td class="hide-sm">${esc(i.host) || "—"}${i.reactivity.length ? `<span class="sub">vs ${esc(short(i.reactivity.join(", "), 30))}</span>` : ""}</td>
           <td class="hide-sm">${esc(i.conjugate) || "—"}</td>
           <td class="num">${i.citations}</td>
-          <td class="hide-sm"><a href="https://www.antibodyregistry.org/${esc(i.rrid)}">${esc(i.rrid)}</a>${omapTag(i.omap)}</td>
+          <td class="hide-sm"><a href="https://www.antibodyregistry.org/${esc(i.rrid)}">${esc(i.rrid)}</a>${omapTag(i.omap)}${koTag(i.ko)}</td>
         </tr>`;
       }).join("");
       $("more").hidden = rows.length <= shown;
@@ -967,6 +1094,7 @@
           discontinued: it.filter((i) => i.discontinued).length,
           citations: it.reduce((a, i) => a + i.citations, 0),
           omap: [...new Set(it.flatMap((i) => i.omap))],
+          ko: (it.find((i) => i.ko && i.ko.how === "rrid") || it.find((i) => i.ko) || {}).ko || null,
         };
       });
       out.forEach((g) => { g.pkey = paperKey(g); });
@@ -1004,7 +1132,7 @@
     function renderGroups(gs, rows) {
       const page = gs.slice(0, gShown);
       $("grows").innerHTML = page.map((g, idx) => `<tr>
-          <td><button class="clonebtn" type="button" data-clone="${esc(g.key)}">${esc(g.clone)}</button>${omapTag(g.omap)}<span class="sub">${esc(g.clonality)}</span></td>
+          <td><button class="clonebtn" type="button" data-clone="${esc(g.key)}">${esc(g.clone)}</button>${omapTag(g.omap)}${koTag(g.ko)}<span class="sub">${esc(g.clonality)}</span></td>
           <td class="hide-sm" title="${esc(g.target)}">${esc(short(g.target, 30))}</td>
           <td>${g.n}${g.discontinued ? `<span class="tag">${g.discontinued} discontinued</span>` : ""}<span class="sub">${esc(short(g.vendors.slice(0, 3).join(", "), 60))}${g.vendors.length > 3 ? ` +${g.vendors.length - 3}` : ""}</span></td>
           <td class="hide-sm">${esc(g.hosts.join(", ")) || "—"}</td>
@@ -1047,7 +1175,8 @@
       const cols = ["rrid", "target", "name", "vendor", "catalog", "clone", "clonality", "host", "conjugate", "citations", "discontinued", "product_url"];
       const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
       const omapIds = (i) => (omap ? i.omap.map((p) => omap.panels[p].id).join(" ") : "");
-      const lines = [cols.concat("omap_panels").join(",")].concat(filtered().map((i) => cols.map((c) => q(i[c])).concat(q(omapIds(i))).join(",")));
+      const koCell = (i) => (i.ko ? Object.entries(i.ko.r).map(([a, [lv]]) => `${a}:${KO_WORD[lv]}`).join("; ") + (i.ko.how === "clone" ? ` (same clone, ${i.ko.rrid})` : "") : "");
+      const lines = [cols.concat("omap_panels", "knockout_ycharos").join(",")].concat(filtered().map((i) => cols.map((c) => q(i[c])).concat(q(omapIds(i)), q(koCell(i))).join(",")));
       const blob = new Blob([lines.join("\n")], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -1059,7 +1188,7 @@
     $("form").addEventListener("submit", (e) => { e.preventDefault(); run($("q").value); });
     document.querySelectorAll(".examples button").forEach((b) => b.addEventListener("click", () => run(b.dataset.q)));
     $("f-more").addEventListener("change", (e) => { const v = e.target.value; e.target.value = ""; loadVendor(v); });
-    ["f-clonality", "f-host", "f-react", "f-conj", "f-disc", "f-omap"].forEach((id) => $(id).addEventListener("change", () => { shown = PAGE; gShown = GPAGE; render(); }));
+    ["f-clonality", "f-host", "f-react", "f-conj", "f-disc", "f-omap", "f-ko"].forEach((id) => $(id).addEventListener("change", () => { shown = PAGE; gShown = GPAGE; render(); }));
     $("f-text").addEventListener("input", () => { shown = PAGE; gShown = GPAGE; render(); });
     $("more").addEventListener("click", () => { shown += PAGE; render(); });
     $("csv").addEventListener("click", csv);
@@ -1091,6 +1220,7 @@
     });
     $("panel-clear").addEventListener("click", () => { panel = []; savePanel(); renderPanel(); if (data) render(); });
     renderPanel();
+    koReady.then(() => { if (panel.length) renderPanel(); });
     document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { cloneFilter = null; setView(b.dataset.view); }));
     $("grows").addEventListener("click", (e) => {
       const b = e.target.closest("[data-clone]");

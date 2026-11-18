@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PanelScout — Suyog Pathare</title>
-  <meta name="description" content="Paste a gene list and see how much of it each pre-designed Xenium and CosMx spatial transcriptomics panel covers.">
+  <meta name="description" content="Paste a gene list and see how much of it each imaging spatial transcriptomics panel covers, using panel files you load from the vendors. Runs in your browser.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -69,9 +69,24 @@
     .x { color: var(--muted); font-size: 12px; cursor: help; }
     .legend { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; align-items: center; }
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend [hidden] { display: none; }
 
     .credits { color: var(--muted); font-size: 12px; margin-top: 48px; line-height: 1.6; }
     .credits ul { margin: 6px 0 10px; padding-left: 18px; }
+
+    .loader { border: 1px dashed var(--line); border-radius: 18px; padding: 18px 22px; margin: 0 0 28px; }
+    .loader.drag { border-color: var(--pill); background: var(--band); }
+    .loader h2 { font-size: 20px; margin: 0 0 6px; }
+    .loader ol { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+    .loader li { margin: 4px 0; }
+    .loader .files { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 12px; }
+    .loader input[type=file] { font: inherit; font-size: 14px; max-width: 100%; }
+    .loaded { margin: 12px 0 0; padding: 0; list-style: none; font-size: 14px; }
+    .loaded li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+    .loaded li .n { color: var(--muted); font-size: 13px; }
+    .loaded li button { margin-left: auto; }
+    #out [hidden] { display: none !important; }
+    .err-list { color: #d70015; font-size: 14px; margin: 8px 0 0; }
   </style>
 </head>
 <body>
@@ -89,7 +104,7 @@
     <section class="ps-head">
       <div class="wrap">
         <h1>PanelScout</h1>
-        <p>Paste a gene list to see how much of it each pre-designed imaging spatial transcriptomics panel covers, which genes each panel is missing, and which genes no panel has. Uses the gene lists 10x Genomics and Bruker publish for Xenium and CosMx. Protein and common names such as PD-L1 or Ki-67 are matched to gene symbols.</p>
+        <p>Paste a gene list to see how much of it each imaging spatial transcriptomics panel covers, which genes each panel is missing, and which genes no panel has. Load the panels you want to compare from the vendors' own files; everything runs in your browser, and nothing you load or paste is uploaded. Common names such as PD-L1 or Ki-67 are matched to gene symbols.</p>
         <form class="entry" id="form">
           <label for="genes" class="sr-only" style="position:absolute;left:-9999px">Gene list</label>
           <textarea id="genes" placeholder="CD3E, CD8A, PD-L1, FOXP3 … one per line, or separated by commas or spaces" spellcheck="false" autocomplete="off"></textarea>
@@ -110,6 +125,22 @@
 
     <section class="ps-body">
       <div class="wrap">
+        <div class="loader" id="loader">
+          <h2>Panels to compare</h2>
+          <p class="sec-note" style="margin:0">PanelScout does not host vendor panel lists. Download the gene list files you want to compare from each vendor, then load them here:</p>
+          <ol>
+            <li><b>10x Genomics Xenium</b>: on the <a href="https://www.10xgenomics.com/support/software/xenium-panel-designer/latest/tutorials/pre-designed-xenium-v1">pre-designed Xenium v1 panels</a> or <a href="https://www.10xgenomics.com/support/software/xenium-panel-designer/latest/analysis/pre-designed-panels/pre-designed-xenium-prime-5k">Xenium Prime 5K</a> page, download each panel's gene list (JSON). A custom panel's JSON from Xenium Panel Designer works too.</li>
+            <li><b>Bruker CosMx</b>: from each panel's gene list page at <a href="https://brukerspatialbiology.com/">Bruker Spatial Biology</a> (for example the <a href="https://brukerspatialbiology.com/resources/cosmx-human-6k-discovery-panel-gene-list/">Human 6K Discovery gene list</a>), download the Excel file.</li>
+            <li><b>Any other panel</b>: a CSV or text file with one gene per line (first column of a CSV).</li>
+          </ol>
+          <div class="files">
+            <input type="file" id="file" multiple accept=".json,.xlsx,.xls,.csv,.tsv,.txt" aria-label="Load panel files">
+            <span class="sub" style="margin:0">or drop files here. Loaded panels are kept in this browser only.</span>
+          </div>
+          <div class="err-list" id="load-err" role="status"></div>
+          <ul class="loaded" id="loaded"></ul>
+        </div>
+
         <p class="status" id="status" role="status" aria-live="polite"></p>
         <div id="out" hidden>
           <div class="resolve" id="resolve"></div>
@@ -132,20 +163,17 @@
             <span><i class="dot addon"></i> in the swappable add-on module</span>
             <span><span class="x">excl.</span> left out on purpose by the vendor</span>
             <button type="button" class="linkbtn" id="csv">Download CSV</button>
-            <button type="button" class="linkbtn" id="copylink">Copy link to this list</button>
+            <button type="button" class="linkbtn" id="copylink">Copy link to this gene list</button>
           </div>
           <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
           <p class="sec-note" id="matrix-more" style="margin-top:10px"></p>
         </div>
 
         <div class="credits" id="credits">
-          <p>Gene lists, as published by each vendor (<span id="built">—</span>):</p>
-          <ul id="sources"></ul>
-          <p>Gene symbols and aliases: <a href="https://www.genenames.org">HGNC</a> (human) and <a href="https://www.informatics.jax.org">MGI</a> (mouse). Vendor names that have since been renamed are matched to the current symbol. Probes written as several genes (for example HBA1/2) count for each of those genes and are marked as shared.</p>
-          <p>Not included yet: Vizgen MERSCOPE (gene lists are shared after registration) and Visium HD (its probe set covers most of the protein-coding transcriptome).</p>
-          <p class="cite"><b>How to cite:</b> Pathare S. PanelScout: gene list coverage across pre-designed imaging spatial transcriptomics panels. Version 1.0, 2026. https://suyogpathare.com/panelscout/<span class="doi"> <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a></span></p>
+          <p>Gene symbols and aliases: <a href="https://www.genenames.org">HGNC</a> (human) and <a href="https://www.informatics.jax.org">MGI</a> (mouse), <span id="built">—</span>. Names in a panel file that have since been renamed are matched to the current symbol. Probes written as several genes (for example HBA1/2) count for each of those genes and are marked as shared. In CosMx files, add-on module genes and the "Known Missing Targets" sheet are read when present.</p>
+          <p class="cite"><b>How to cite:</b> Pathare S. PanelScout: gene list coverage across pre-designed imaging spatial transcriptomics panels. Version 1.1, 2026. https://suyogpathare.com/panelscout/<span class="doi"> <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a></span></p>
           <p>Scientific design and validation by Suyog Pathare.</p>
-          <p>Independent tool, not affiliated with or endorsed by 10x Genomics or Bruker. Panels and their contents change; confirm with the vendor before ordering. Your gene list stays in your browser.</p>
+          <p>Independent tool, not affiliated with or endorsed by 10x Genomics, Bruker or any other vendor. Panel contents are read from the files you load and are not stored or shared by this site; check panel details with the vendor before ordering.</p>
         </div>
       </div>
     </section>
@@ -159,34 +187,40 @@
   (() => {
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-    const SHORT = {
-      "xenium-5k-human": "Xenium 5K", "xenium-multi-human": "Xenium Multi-Tissue", "xenium-io-human": "Xenium Immuno-Onc",
-      "xenium-brain-human": "Xenium Brain", "xenium-breast-human": "Xenium Breast", "xenium-colon-human": "Xenium Colon",
-      "xenium-lung-human": "Xenium Lung", "xenium-skin-human": "Xenium Skin",
-      "cosmx-wtx-human": "CosMx WTX", "cosmx-6k-human": "CosMx 6K", "cosmx-ucc-human": "CosMx 1K UCC", "cosmx-io-human": "CosMx IO 100",
-      "xenium-5k-mouse": "Xenium 5K", "xenium-multi-mouse": "Xenium Tissue Atlas", "xenium-brain-mouse": "Xenium Brain",
-      "cosmx-ucc-mouse": "CosMx 1K UCC", "cosmx-neuro-mouse": "CosMx 1K Neuro",
-    };
     const EXAMPLES = {
       io: ["human", "CD3E CD4 CD8A FOXP3 MS4A1 CD19 NCAM1 CD68 CD163 ITGAX PTPRC PD-1 PD-L1 LAG3 HAVCR2 TIGIT CTLA4 GZMB PRF1 IFNG Ki-67 EPCAM KRT8 VIM"],
       brain: ["mouse", "Rbfox3 Slc17a7 Gad1 Gad2 Pvalb Sst Vip Gfap Aqp4 Aldh1l1 Olig2 Mbp Plp1 Pdgfra Tmem119 P2ry12 Cx3cr1 Cldn5 Pecam1 Mki67"],
     };
+    const STORE = "panelscout-panels-v1";
+    const LINK_MAX = 400, MATRIX_MAX = 500;
+    const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    const XLSX_SRI = "sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==";
     const cache = {};
     let species = "human", data = null, last = null, runId = 0, linkable = true, matrixAll = false;
-    const LINK_MAX = 400, MATRIX_MAX = 500;
+    let panels = [];
+    try { panels = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch { panels = []; }
+    if (!Array.isArray(panels)) panels = [];
+    panels = panels.filter((p) => p && Array.isArray(p.genes) && typeof p.name === "string" && (p.species === "human" || p.species === "mouse"));
+    const savePanels = () => { try { localStorage.setItem(STORE, JSON.stringify(panels)); } catch { $("load-err").textContent = "This browser could not keep the loaded panels; they will be gone after a reload."; } };
+    const sets = new Map(); // panel id -> {g:Set, addon:Set, excluded:Map}
+    const setsFor = (p) => {
+      if (!sets.has(p.id)) sets.set(p.id, { g: new Set(p.genes.map((x) => x.toUpperCase())), addon: new Set((p.addon || []).map((x) => x.toUpperCase())), excluded: new Map(Object.entries(p.excluded || {}).map(([k, v]) => [k.toUpperCase(), v])) });
+      return sets.get(p.id);
+    };
 
     $("yr").textContent = new Date().getFullYear();
 
+    // Gene symbols and aliases (HGNC / MGI).
     async function load(sp) {
       if (!cache[sp]) {
         let r;
-        try { r = await fetch(`/data/panels-${sp}.json`); } catch { r = null; }
-        if (!r || !r.ok) throw new Error("Could not load the panel lists. Check your connection and try again.");
+        try { r = await fetch(`/data/genes-${sp}.json`); } catch { r = null; }
+        if (!r || !r.ok) throw new Error("Could not load the gene symbol list. Check your connection and try again.");
         const d = await r.json();
-        d.upper = new Map(d.genes.map((g, i) => [g.toUpperCase(), i]));
-        d.known = new Set(d.known.map((g) => g.toUpperCase()));
-        d.sets = d.panels.map((p) => ({ g: new Set(p.g), addon: new Set(p.addon), excluded: new Map(Object.entries(p.excluded || {}).map(([k, v]) => [k.toUpperCase(), v])) }));
+        d.exact = new Set(d.genes);
+        d.official = new Map(d.genes.map((g) => [g.toUpperCase(), g]));
         cache[sp] = d;
+        $("built").textContent = `retrieved ${d.built}`;
       }
       return cache[sp];
     }
@@ -194,12 +228,13 @@
     function setSpecies(sp) {
       species = sp;
       document.querySelectorAll("[data-sp]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.sp === sp)));
+      drawLoaded();
     }
 
     const tokens = (text) => {
       const seen = new Set(), out = [];
-      // Dashes from Word/PDF (‐ ‑ ‒ – — −) become plain hyphens.
-      const clean = text.replace(/[\u2010-\u2015\u2212]/g, "-");
+      // Dashes from Word/PDF become plain hyphens.
+      const clean = text.replace(/[‐-―−]/g, "-");
       for (const t of clean.split(/[\s,;]+/)) {
         const s = t.trim().replace(/^["'(\[]+|["')\].:+]+$/g, "");
         if (s && !seen.has(s.toUpperCase())) { seen.add(s.toUpperCase()); out.push(s); }
@@ -207,13 +242,34 @@
       return out;
     };
 
-    // input -> { input, gene, idx, kind: ok|renamed|ambiguous|offpanel|unknown, alts }
-    const GREEK = { "\u03b1": "A", "\u03b2": "B", "\u03b3": "G", "\u03b4": "D", "\u03b5": "E", "\u03ba": "K", "\u03bb": "L" };
+    // A name -> current symbol, or null. Used for panel files, where only an unambiguous match counts.
+    function strict(d, name) {
+      if (d.exact.has(name)) return name; // exact case first: mouse has both T and t
+      const u = name.toUpperCase();
+      if (d.official.has(u)) return d.official.get(u);
+      const a = d.alias[u];
+      return a && a.length === 1 ? a[0] : null;
+    }
+    // "CCL3/L1/L3", "HBA1/2": each suffix replaces the end of the first name; the longest prefix that gives a real gene wins.
+    function expand(d, probe) {
+      const parts = probe.split("/"), base = parts[0], first = strict(d, base);
+      if (!first) return [];
+      const out = [first];
+      for (const s of parts.slice(1)) {
+        let hit = null;
+        for (let k = base.length; k > 0 && !hit; k--) hit = strict(d, base.slice(0, k) + s);
+        if (!hit) return [];
+        out.push(hit);
+      }
+      return out;
+    }
+
+    // User input -> { input, gene, kind: ok|renamed|ambiguous|unknown, alts }
+    const GREEK = { "α": "A", "β": "B", "γ": "G", "δ": "D", "ε": "E", "κ": "K", "λ": "L" };
     function resolve(d, t) {
       const r = resolveOne(d, t);
       if (r.kind !== "unknown") return r;
-      // Retry spellings people write: TNF-α -> TNFA, IFNγ -> IFNG, HLA DR -> HLADR.
-      const g = t.toLowerCase().replace(/[\u03b1-\u03c9]/g, (c) => GREEK[c] || c);
+      const g = t.toLowerCase().replace(/[α-ω]/g, (c) => GREEK[c] || c);
       for (const v of new Set([g, g.replace(/-/g, ""), t.replace(/-/g, "")])) {
         if (v.toUpperCase() === t.toUpperCase()) continue;
         const x = resolveOne(d, v);
@@ -222,131 +278,251 @@
       return r;
     }
     function resolveOne(d, t) {
+      if (d.exact.has(t)) return { input: t, gene: t, kind: "ok" };
       const U = t.toUpperCase();
-      const direct = d.upper.get(U);
-      if (direct !== undefined && d.known.has(U)) return { input: t, gene: d.genes[direct], idx: direct, kind: "ok" };
+      if (d.official.has(U)) return { input: t, gene: d.official.get(U), kind: "ok" };
       const hits = d.alias[U];
-      if (hits && hits.length) {
-        const idx = d.upper.get(hits[0].toUpperCase());
-        return { input: t, gene: hits[0], idx, kind: hits.length > 1 ? "ambiguous" : "renamed", alts: hits.slice(1) };
-      }
-      if (direct !== undefined) return { input: t, gene: d.genes[direct], idx: direct, kind: "ok" };
-      if (d.known.has(U)) return { input: t, gene: t, idx: undefined, kind: "offpanel" };
-      return { input: t, gene: t, idx: undefined, kind: "unknown" };
+      if (hits && hits.length) return { input: t, gene: hits[0], kind: hits.length > 1 ? "ambiguous" : "renamed", alts: hits.slice(1) };
+      return { input: t, gene: t, kind: "unknown" };
     }
 
-    function chips(list, cls = "") {
-      return list.map((g) => `<span class="chip ${cls}">${esc(g)}</span>`).join("");
+    // ---- Panel files -------------------------------------------------------
+    let xlsxLib = null;
+    function loadXlsx() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (!xlsxLib) xlsxLib = new Promise((ok, fail) => {
+        const s = document.createElement("script");
+        s.src = XLSX_URL; s.integrity = XLSX_SRI; s.crossOrigin = "anonymous";
+        s.onload = () => ok(window.XLSX); s.onerror = () => { xlsxLib = null; fail(new Error("Could not load the Excel reader; check your connection.")); };
+        document.head.appendChild(s);
+      });
+      return xlsxLib;
     }
+    const baseName = (f) => f.name.replace(/\.[^.]+$/, "");
+    // "LBL-11190-04-Human-6k-Discovery-Gene-List" -> "Human 6k Discovery"
+    const tidy = (n) => n.replace(/^LBL[-_]\d+[-_]\d+[-_]?/i, "").replace(/[-_]+/g, " ").replace(/\b(gene|probe)?\s*(target\s+)?list\b/gi, "").replace(/\s+/g, " ").trim();
+
+    // Rows of a sheet from the cells that exist. Some vendor workbooks declare a used range of
+    // millions of empty cells, which sheet_to_json would walk one by one.
+    function sheetRows(X, ws) {
+      const rows = [];
+      for (const k of Object.keys(ws)) {
+        if (k[0] === "!" || ws[k].f) continue; // formulas are footnotes and cross-references, not genes
+        const { r, c } = X.utils.decode_cell(k);
+        const v = ws[k].w != null ? ws[k].w : ws[k].v;
+        if (v == null || v === "") continue;
+        (rows[r] ||= [])[c] = String(v);
+      }
+      return Array.from(rows, (r) => r || []);
+    }
+
+    async function parseFile(f) {
+      const ext = (f.name.match(/\.([^.]+)$/) || [, ""])[1].toLowerCase();
+      if (ext === "json") {
+        let j;
+        try { j = JSON.parse(await f.text()); } catch { throw new Error("not valid JSON"); }
+        const pl = j.payload || j;
+        if (!pl.targets || !Array.isArray(pl.targets)) throw new Error("no gene targets found; expected a Xenium panel JSON");
+        const names = pl.targets.filter((t) => t && t.type && t.type.descriptor === "gene" && t.type.data && t.type.data.name).map((t) => String(t.type.data.name));
+        let name = (pl.panel && pl.panel.identity && pl.panel.identity.name) || baseName(f);
+        if (!/xenium/i.test(name)) name = "Xenium " + name;
+        const sp = String((pl.panel && pl.panel.species) || "").toLowerCase();
+        return { name: name.replace(/ Gene Expression| Panel$/g, ""), vendor: "10x Genomics (Xenium)", names, addon: [], excluded: {}, species: sp === "human" || sp === "mouse" ? sp : "" };
+      }
+      if (ext === "xlsx" || ext === "xls") {
+        const X = await loadXlsx();
+        const wb = X.read(await f.arrayBuffer(), { type: "array" });
+        const sheet = wb.SheetNames.find((n) => /gene and probe details/i.test(n));
+        if (sheet) {
+          const rows = sheetRows(X, wb.Sheets[sheet]);
+          const hi = rows.findIndex((r) => r.some((c) => /^display name$/i.test(String(c || "").trim())));
+          if (hi < 0) throw new Error("no \"Display Name\" column in the gene sheet");
+          const head = Array.from(rows[hi], (c) => String(c || "").trim().toLowerCase());
+          const iName = head.indexOf("display name"), iType = head.indexOf("panel type");
+          const names = [], addon = [];
+          for (const r of rows.slice(hi + 1)) {
+            const g = String(r[iName] || "").trim();
+            // Skip negative-control probes, section labels and formulas.
+            if (!g || g.startsWith("=") || /^(negative|negprb|systemcontrol|falsecode)/i.test(g)) continue;
+            names.push(g);
+            if (iType >= 0 && String(r[iType] || "").trim().toLowerCase() === "add-on") addon.push(g);
+          }
+          const excluded = {};
+          const miss = wb.SheetNames.find((n) => /known missing targets/i.test(n));
+          if (miss) {
+            const mr = sheetRows(X, wb.Sheets[miss]);
+            for (const r of mr.slice(2)) if (r[0] && r[1]) excluded[String(r[0]).trim()] = String(r[1]).trim();
+          }
+          const title = `${(rows[0] || []).join(" ")} ${f.name}`;
+          const sp = /\bmouse\b/i.test(title) ? "mouse" : /\bhuman\b/i.test(title) ? "human" : "";
+          return { name: (/cosmx/i.test(tidy(baseName(f))) ? "" : "CosMx ") + tidy(baseName(f)), vendor: "Bruker (CosMx)", names, addon, excluded, species: sp };
+        }
+        // Any other workbook: first column of the first sheet.
+        const rows = sheetRows(X, wb.Sheets[wb.SheetNames[0]]);
+        return { name: tidy(baseName(f)), vendor: "", names: rows.map((r) => String(r[0] || "").trim()).filter(Boolean), addon: [], excluded: {} };
+      }
+      if (["csv", "tsv", "txt"].includes(ext)) {
+        const lines = (await f.text()).split(/\r?\n/);
+        const names = lines.map((l) => l.split(ext === "txt" ? /[\t,;\s]+/ : ext === "tsv" ? "\t" : ",")[0].trim().replace(/^"|"$/g, "")).filter(Boolean);
+        return { name: tidy(baseName(f)), vendor: "", names, addon: [], excluded: {} };
+      }
+      throw new Error("unsupported file type; use a Xenium .json, a CosMx .xlsx, or a .csv/.txt gene list");
+    }
+
+    // Vendor names -> current symbols, in the species whose symbols match best.
+    async function toPanel(raw, fileName) {
+      const tryIn = async (sp) => {
+        const d = await load(sp);
+        const genes = [], addon = [], shared = {}, renamed = [];
+        let unmatched = [];
+        const addonSet = new Set(raw.addon);
+        for (const n of raw.names) {
+          let gs = n.includes("/") ? expand(d, n) : [strict(d, n)].filter(Boolean);
+          if (!gs.length) { unmatched.push(n); genes.push(n); continue; } // kept as written, e.g. "MHC I", so a search for that name still finds it
+          if (n.includes("/")) gs.forEach((g) => { shared[g] = n; });
+          else if (gs[0] !== n) renamed.push(n);
+          genes.push(...gs);
+          if (addonSet.has(n)) addon.push(...gs);
+        }
+        return { sp, genes: [...new Set(genes)], addon: [...new Set(addon)], shared, unmatched };
+      };
+      const header = /^(gene|genes|symbol|gene symbol|gene name|target|display name|name)$/i;
+      raw.names = raw.names.filter((n, i) => !(i === 0 && header.test(n)));
+      if (!raw.names.length) throw new Error("no gene names found");
+      // Species: stated in the file, else by symbol case (mouse symbols are written Acta2, human ACTA2).
+      const lower = raw.names.filter((n) => /[a-z]/.test(n)).length;
+      const sp = raw.species || (lower > raw.names.length / 2 ? "mouse" : "human");
+      const best = await tryIn(sp);
+      if (best.unmatched.length > raw.names.length * 0.7) throw new Error(`most entries are not ${sp} gene symbols`);
+      return { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, name: raw.name || fileName, vendor: raw.vendor,
+        file: fileName, species: best.sp, targets: new Set(raw.names).size, genes: best.genes, addon: best.addon, shared: best.shared,
+        excluded: raw.excluded, unmatched: best.unmatched.slice(0, 50), nUnmatched: best.unmatched.length, loaded: new Date().toISOString().slice(0, 10) };
+    }
+
+    async function addFiles(files) {
+      const errs = [];
+      $("load-err").textContent = files.length ? "Reading…" : "";
+      for (const f of files) {
+        if (f.size > 25e6) { errs.push(`${f.name}: larger than 25 MB`); continue; }
+        try {
+          const p = await toPanel(await parseFile(f), f.name);
+          panels = panels.filter((x) => !(x.file === p.file && x.species === p.species)); // reloading a file replaces it
+          panels.push(p);
+          if (p.species !== species && !panels.some((x) => x.species === species)) setSpecies(p.species);
+        } catch (e) { errs.push(`${f.name}: ${e.message}`); }
+      }
+      sets.clear();
+      savePanels();
+      $("load-err").textContent = errs.join(" · ");
+      drawLoaded();
+      if ($("genes").value.trim()) run(false);
+    }
+
+    function drawLoaded() {
+      const mine = panels.filter((p) => p.species === species);
+      const other = panels.length - mine.length;
+      $("loaded").innerHTML = mine.map((p) => `<li><b>${esc(p.name)}</b><span class="n">${esc(p.vendor ? p.vendor + " · " : "")}${p.genes.length.toLocaleString()} genes${p.addon.length ? `, ${p.addon.length} in add-on` : ""}${p.nUnmatched ? ` · ${p.nUnmatched} ${p.nUnmatched === 1 ? "entry" : "entries"} kept as written (no current ${p.species} symbol)` : ""}</span>
+          <button type="button" class="linkbtn" data-rm="${esc(p.id)}">Remove</button></li>`).join("")
+        + (mine.length ? `<li style="border-top:0"><span class="n">${other ? `${other} ${species === "human" ? "mouse" : "human"} panel${other > 1 ? "s" : ""} also loaded. ` : ""}</span><button type="button" class="linkbtn" id="rm-all">Remove all panels</button></li>`
+          : `<li style="border-top:0"><span class="n">No ${species} panels loaded yet.${other ? ` ${other} ${species === "human" ? "mouse" : "human"} panel${other > 1 ? "s are" : " is"} loaded.` : ""}</span></li>`);
+    }
+
+    // ---- Coverage ----------------------------------------------------------
+    function chips(list, cls = "") { return list.map((g) => `<span class="chip ${cls}">${esc(g)}</span>`).join(""); }
 
     async function run(pushHash = true) {
-      const raw = $("genes").value;
-      const toks = tokens(raw);
+      const toks = tokens($("genes").value);
       if (!toks.length) { $("status").textContent = "Paste at least one gene."; $("out").hidden = true; return; }
       $("status").className = "status";
-      $("status").textContent = "Loading panel lists…";
+      $("status").textContent = "Loading gene symbols…";
       const id = ++runId, sp = species;
       let d;
       try { d = await load(sp); }
       catch (e) { if (id === runId) { $("status").className = "status err"; $("status").textContent = e.message; } return; }
-      if (id !== runId) return; // a newer check started while this one was loading
+      if (id !== runId) return;
       data = d;
-
       const seen = new Set(), rows = [];
       for (const t of toks) {
-        const r = resolve(data, t);
-        const key = r.gene.toUpperCase();
+        const r = resolve(d, t), key = r.gene.toUpperCase();
         if (seen.has(key)) continue;
-        seen.add(key);
-        rows.push(r);
+        seen.add(key); rows.push(r);
       }
-      last = rows;
-      matrixAll = false;
+      last = rows; matrixAll = false;
       linkable = toks.length <= LINK_MAX;
       if (pushHash) history.replaceState(null, "", linkable ? `#${species}:${encodeURIComponent(toks.join(","))}` : location.pathname);
       render(rows);
     }
 
     function render(rows) {
-      const d = data;
-      const onPanel = rows.filter((r) => r.idx !== undefined);
+      const ps = panels.filter((p) => p.species === species);
       const renamed = rows.filter((r) => r.kind === "renamed" || r.kind === "ambiguous");
-      const offpanel = rows.filter((r) => r.kind === "offpanel");
       const unknown = rows.filter((r) => r.kind === "unknown");
-
-      const nk = rows.length - unknown.length;
-      $("status").textContent = `${nk.toLocaleString()} gene${nk === 1 ? "" : "s"} checked against ${d.panels.length} ${species} panels` +
+      const known = rows.filter((r) => r.kind !== "unknown");
+      const nk = known.length;
+      $("status").textContent = `${nk.toLocaleString()} gene${nk === 1 ? "" : "s"} checked against ${ps.length} loaded ${species} panel${ps.length === 1 ? "" : "s"}` +
         (unknown.length ? `; ${unknown.length.toLocaleString()} ${unknown.length === 1 ? "entry" : "entries"} not recognized.` : ".");
 
-      // What we understood.
       let h = "";
-      if (renamed.length) {
-        h += `<p><span class="lbl">Matched to gene symbols:</span> ` + renamed.map((r) =>
-          `<span class="chip">${esc(r.input)} → ${esc(r.gene)}` +
-          (r.alts && r.alts.length ? ` <span class="sub" style="display:inline">or</span> ` +
-            r.alts.slice(0, 4).map((a) => `<button type="button" data-swap="${esc(r.input)}" data-to="${esc(a)}">${esc(a)}</button>`).join(", ") : "") +
-          `</span>`).join("") + `</p>`;
-      }
+      if (renamed.length) h += `<p><span class="lbl">Matched to gene symbols:</span> ` + renamed.map((r) =>
+        `<span class="chip">${esc(r.input)} → ${esc(r.gene)}` + (r.alts && r.alts.length ? ` <span class="sub" style="display:inline">or</span> ` +
+          r.alts.slice(0, 4).map((a) => `<button type="button" data-swap="${esc(r.input)}" data-to="${esc(a)}">${esc(a)}</button>`).join(", ") : "") + `</span>`).join("") + `</p>`;
       if (unknown.length) h += `<p><span class="lbl">Not recognized as ${species} gene symbols (check spelling):</span> ${chips(unknown.map((r) => r.input), "miss")}</p>`;
       if (!h) h = `<p><span class="lbl">All ${rows.length} entries are current ${species} gene symbols.</span></p>`;
+      if (!ps.length) h += `<p><b>Load at least one ${species} panel file above to see coverage.</b></p>`;
       $("resolve").innerHTML = h;
+      $("out").hidden = false;
+      document.querySelectorAll("#out > :not(#resolve)").forEach((el) => { el.hidden = !ps.length; });
+      if (!ps.length) return;
 
-      // Panel table.
-      const stats = d.panels.map((p, i) => {
-        const s = d.sets[i];
-        const cov = onPanel.filter((r) => s.g.has(r.idx));
-        const miss = rows.filter((r) => r.kind !== "unknown" && !(r.idx !== undefined && s.g.has(r.idx)));
-        return { p, i, cov, miss, addon: cov.filter((r) => s.addon.has(r.idx)), shared: cov.filter((r) => p.shared[r.idx]) };
+      const has = (p, r) => setsFor(p).g.has(r.gene.toUpperCase());
+      const stats = ps.map((p) => {
+        const s = setsFor(p), cov = known.filter((r) => has(p, r));
+        return { p, s, cov, miss: known.filter((r) => !has(p, r)), addon: cov.filter((r) => s.addon.has(r.gene.toUpperCase())), shared: cov.filter((r) => p.shared[r.gene]) };
       });
-      const total = rows.length - unknown.length;
-      stats.sort((a, b) => b.cov.length - a.cov.length || (a.p.targets || a.p.n) - (b.p.targets || b.p.n));
-      $("panels").tBodies[0].innerHTML = stats.map((s) => {
-        const pct = total ? Math.round((100 * s.cov.length) / total) : 0;
+      stats.sort((a, b) => b.cov.length - a.cov.length || a.p.targets - b.p.targets);
+      $("panels").tBodies[0].innerHTML = stats.map((st) => {
+        const pct = nk ? Math.round((100 * st.cov.length) / nk) : 0;
         const notes = [];
-        if (s.addon.length) notes.push(`${s.addon.length} in the 50-gene add-on module, which can be swapped for a custom one`.replace("50-gene", s.p.id === "cosmx-io-human" ? "10-gene" : "50-gene"));
-        if (s.shared.length) notes.push(`${s.shared.length} detected by a probe shared with a related gene`);
-        const missNames = s.miss.map((r) => {
-          const why = d.sets[s.i].excluded.get(r.gene.toUpperCase());
+        if (st.addon.length) notes.push(`${st.addon.length} in the add-on module, which can be swapped for a custom one`);
+        if (st.shared.length) notes.push(`${st.shared.length} detected by a probe shared with a related gene`);
+        const missNames = st.miss.map((r) => {
+          const why = st.s.excluded.get(r.gene.toUpperCase());
           return why ? `<span class="chip miss" title="${esc(why)}">${esc(r.gene)}*</span>` : `<span class="chip miss">${esc(r.gene)}</span>`;
         });
         const SHOW = 14;
-        const missHtml = !missNames.length ? `<span class="sub">none</span>` :
-          missNames.length <= SHOW ? missNames.join("") :
-          missNames.slice(0, SHOW).join("") + `<button type="button" class="linkbtn" data-more="${s.i}" style="font-size:13px">and ${missNames.length - SHOW} more</button><span hidden data-rest="${s.i}">${missNames.slice(SHOW).join("")}</span>`;
-        const excl = s.miss.some((r) => d.sets[s.i].excluded.has(r.gene.toUpperCase()));
+        const missHtml = !missNames.length ? `<span class="sub">none</span>` : missNames.length <= SHOW ? missNames.join("")
+          : missNames.slice(0, SHOW).join("") + `<button type="button" class="linkbtn" data-more style="font-size:13px">and ${missNames.length - SHOW} more</button><span hidden>${missNames.slice(SHOW).join("")}</span>`;
+        const excl = st.miss.some((r) => st.s.excluded.has(r.gene.toUpperCase()));
         return `<tr>
-          <td><a href="${esc(s.p.page)}" target="_blank" rel="noopener">${esc(s.p.name)}</a><span class="sub">${esc(s.p.vendor)}</span></td>
-          <td class="num">${(s.p.targets || s.p.n).toLocaleString()}${s.p.targets && s.p.n !== s.p.targets ? `<span class="sub" title="Some probes detect several related genes, so the panel covers more genes than it has targets">${s.p.n.toLocaleString()} genes</span>` : ""}</td>
-          <td class="cov"><b>${s.cov.length}</b> of ${total} <span class="sub" style="display:inline">(${pct}%)</span>
+          <td>${esc(st.p.name)}<span class="sub">${esc(st.p.vendor || st.p.file)}</span></td>
+          <td class="num">${st.p.targets.toLocaleString()}${st.p.genes.length !== st.p.targets ? `<span class="sub" title="Some probes detect several related genes, and some entries may not match a current symbol">${st.p.genes.length.toLocaleString()} genes</span>` : ""}</td>
+          <td class="cov"><b>${st.cov.length}</b> of ${nk} <span class="sub" style="display:inline">(${pct}%)</span>
             <div class="covbar" aria-hidden="true"><span style="width:${pct}%"></span></div>
             ${notes.map((n) => `<span class="sub">${esc(n)}</span>`).join("")}</td>
           <td class="missing">${missHtml}${excl ? `<span class="sub">* left out of the panel on purpose; hover for the vendor's reason</span>` : ""}</td>
         </tr>`;
       }).join("");
 
-      // Genes no panel has.
-      const nowhere = rows.filter((r) => r.kind !== "unknown" && !d.sets.some((s) => r.idx !== undefined && s.g.has(r.idx)));
-      $("nowhere").innerHTML = nowhere.length ? `<h2 class="sec">Not on any pre-designed ${species} panel</h2>
-        <p class="sec-note">These would need a custom panel or a custom add-on (check each vendor's add-on size limits and probe design rules), or you could detect the protein instead. Each gene links to its antibodies in <a href="/abscout/">AbScout</a>.</p>
+      const nowhere = known.filter((r) => !ps.some((p) => has(p, r)));
+      $("nowhere").innerHTML = nowhere.length ? `<h2 class="sec">Not on any loaded ${species} panel</h2>
+        <p class="sec-note">These would need another panel, a custom panel or add-on (check each vendor's design rules), or you could detect the protein instead. Each gene links to its antibodies in <a href="/abscout/">AbScout</a>.</p>
         <div>${nowhere.map((r) => `<a class="chip miss" href="/abscout/?q=${encodeURIComponent(r.gene)}" title="Antibodies for ${esc(r.gene)} in AbScout">${esc(r.gene)}</a>`).join("")}</div>` : "";
 
-      // Matrix, panels in the same order as the table.
-      const order = stats.map((s) => s.i);
-      const allKnown = rows.filter((r) => r.kind !== "unknown");
-      const known = matrixAll ? allKnown : allKnown.slice(0, MATRIX_MAX);
-      let m = `<thead><tr><th class="g">Gene</th>${order.map((i) => `<th class="rot" title="${esc(d.panels[i].name)}">${esc(SHORT[d.panels[i].id] || d.panels[i].name)}</th>`).join("")}</tr></thead><tbody>`;
-      for (const r of known) {
+      const order = stats.map((st) => st.p);
+      const shown = matrixAll ? known : known.slice(0, MATRIX_MAX);
+      let m = `<thead><tr><th class="g">Gene</th>${order.map((p) => `<th class="rot" title="${esc(p.name)}">${esc(p.name.length > 34 ? p.name.slice(0, 33) + "…" : p.name)}</th>`).join("")}</tr></thead><tbody>`;
+      for (const r of shown) {
         m += `<tr><td class="g"><a href="/abscout/?q=${encodeURIComponent(r.gene)}" title="Antibodies for ${esc(r.gene)} in AbScout">${esc(r.gene)}</a>${r.input.toUpperCase() !== r.gene.toUpperCase() ? `<span class="sub">${esc(r.input)}</span>` : ""}</td>`;
-        for (const i of order) {
-          const s = d.sets[i], p = d.panels[i];
+        for (const p of order) {
+          const s = setsFor(p), U = r.gene.toUpperCase();
           let c = "";
-          if (r.idx !== undefined && s.g.has(r.idx)) {
-            const probe = p.shared[r.idx];
+          if (s.g.has(U)) {
+            const probe = p.shared[r.gene];
             if (probe) c = `<i class="dot shared" title="${esc(`Probe ${probe} also detects the related gene(s)`)}"></i><span style="position:absolute;left:-9999px">shared</span>`;
-            else if (s.addon.has(r.idx)) c = `<i class="dot addon" title="In the swappable add-on module"></i><span style="position:absolute;left:-9999px">add-on</span>`;
+            else if (s.addon.has(U)) c = `<i class="dot addon" title="In the swappable add-on module"></i><span style="position:absolute;left:-9999px">add-on</span>`;
             else c = `<i class="dot" title="In the panel"></i><span style="position:absolute;left:-9999px">yes</span>`;
           } else {
-            const why = s.excluded.get(r.gene.toUpperCase());
+            const why = s.excluded.get(U);
             if (why) c = `<span class="x" title="${esc(why)}">excl.</span>`;
           }
           m += `<td class="c">${c}</td>`;
@@ -354,20 +530,20 @@
         m += `</tr>`;
       }
       $("matrix").innerHTML = m + "</tbody>";
-      $("matrix-more").innerHTML = allKnown.length > known.length
-        ? `Showing the first ${known.length} of ${allKnown.length.toLocaleString()} genes. <button type="button" class="linkbtn" id="matrix-all">Show all</button> or download the CSV.` : "";
-      $("out").hidden = false;
+      $("matrix-more").innerHTML = known.length > shown.length
+        ? `Showing the first ${shown.length} of ${known.length.toLocaleString()} genes. <button type="button" class="linkbtn" id="matrix-all">Show all</button> or download the CSV.` : "";
     }
 
     function csv() {
-      if (!last || !data) return;
-      const d = data, order = d.panels.map((_, i) => i);
-      const lines = [["gene", "input", ...order.map((i) => d.panels[i].name)]];
+      if (!last) return;
+      const ps = panels.filter((p) => p.species === species);
+      const lines = [["gene", "input", ...ps.map((p) => p.name)]];
       for (const r of last.filter((x) => x.kind !== "unknown")) {
-        lines.push([r.gene, r.input, ...order.map((i) => {
-          const s = d.sets[i], p = d.panels[i];
-          if (r.idx !== undefined && s.g.has(r.idx)) return p.shared[r.idx] ? `shared probe ${p.shared[r.idx]}` : s.addon.has(r.idx) ? "yes (add-on)" : "yes";
-          return s.excluded.get(r.gene.toUpperCase()) ? "excluded by vendor" : "no";
+        const U = r.gene.toUpperCase();
+        lines.push([r.gene, r.input, ...ps.map((p) => {
+          const s = setsFor(p);
+          if (s.g.has(U)) return p.shared[r.gene] ? `shared probe ${p.shared[r.gene]}` : s.addon.has(U) ? "yes (add-on)" : "yes";
+          return s.excluded.get(U) ? "excluded by vendor" : "no";
         })]);
       }
       const text = lines.map((l) => l.map((v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(",")).join("\n");
@@ -378,15 +554,7 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
-    async function showSources() {
-      try {
-        const lists = await Promise.all(["human", "mouse"].map(load));
-        $("built").textContent = `retrieved ${lists[0].built}`;
-        $("sources").innerHTML = lists.flatMap((d) => d.panels).map((p) =>
-          `<li><a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.name)}</a> (${(p.targets || p.n).toLocaleString()} targets), <a href="${esc(p.source)}" target="_blank" rel="noopener">source file</a></li>`).join("");
-      } catch { /* the check itself reports load errors */ }
-    }
-
+    // ---- Events ------------------------------------------------------------
     $("form").addEventListener("submit", (e) => { e.preventDefault(); run(); });
     $("genes").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } });
     document.querySelectorAll("[data-sp]").forEach((b) => b.addEventListener("click", () => { setSpecies(b.dataset.sp); if ($("genes").value.trim()) run(); }));
@@ -396,8 +564,16 @@
       $("genes").value = list.split(" ").join(", ");
       run();
     }));
+    $("file").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
+    const zone = $("loader");
+    ["dragenter", "dragover"].forEach((t) => zone.addEventListener(t, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((t) => zone.addEventListener(t, (e) => { e.preventDefault(); zone.classList.remove("drag"); }));
+    zone.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
     document.addEventListener("click", (e) => {
       if (e.target.id === "matrix-all") { matrixAll = true; render(last); return; }
+      if (e.target.id === "rm-all") { panels = panels.filter((p) => p.species !== species); sets.clear(); savePanels(); drawLoaded(); if (last) render(last); return; }
+      const rm = e.target.closest("[data-rm]");
+      if (rm) { panels = panels.filter((p) => p.id !== rm.dataset.rm); sets.delete(rm.dataset.rm); savePanels(); drawLoaded(); if (last) render(last); return; }
       const more = e.target.closest("[data-more]");
       if (more) { more.nextElementSibling.hidden = false; more.remove(); return; }
       const sw = e.target.closest("[data-swap]");
@@ -405,21 +581,21 @@
         const from = sw.dataset.swap, to = sw.dataset.to;
         // Replace every occurrence, including ones wrapped in punctuation such as (CD3) or CD3+.
         const re = new RegExp(`(^|[^A-Za-z0-9_-])${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^A-Za-z0-9_-])`, "gi");
-        $("genes").value = $("genes").value.replace(/[\u2010-\u2015\u2212]/g, "-").replace(re, `$1${to}`);
+        $("genes").value = $("genes").value.replace(/[‐-―−]/g, "-").replace(re, `$1${to}`);
         run();
       }
     });
     $("csv").addEventListener("click", csv);
     $("copylink").addEventListener("click", async () => {
-      if (!linkable) { $("copylink").textContent = `Lists over ${LINK_MAX} genes are too long for a link; use the CSV`; setTimeout(() => { $("copylink").textContent = "Copy link to this list"; }, 3000); return; }
-      try { await navigator.clipboard.writeText(location.href); $("copylink").textContent = "Link copied"; }
+      if (!linkable) { $("copylink").textContent = `Lists over ${LINK_MAX} genes are too long for a link; use the CSV`; setTimeout(() => { $("copylink").textContent = "Copy link to this gene list"; }, 3000); return; }
+      try { await navigator.clipboard.writeText(location.href); $("copylink").textContent = "Link copied (panels are not part of the link)"; }
       catch { $("copylink").textContent = "Copy the address bar"; }
-      setTimeout(() => { $("copylink").textContent = "Copy link to this list"; }, 2000);
+      setTimeout(() => { $("copylink").textContent = "Copy link to this gene list"; }, 2500);
     });
 
-    // A shared link: #human:CD4,CD8A
+    // A shared link: #human:CD4,CD8A (an older "#human-protein:" link opens as human).
     function fromHash() {
-      const m = location.hash.match(/^#(human|mouse):(.+)$/);
+      const m = location.hash.match(/^#(human|mouse)(?:-protein)?:(.+)$/);
       if (!m) return;
       let list;
       try { list = decodeURIComponent(m[2]); } catch { list = m[2].replace(/%[0-9A-Fa-f]{2}/g, (c) => { try { return decodeURIComponent(c); } catch { return ""; } }); }
@@ -428,8 +604,9 @@
       run(false);
     }
     window.addEventListener("hashchange", fromHash);
+    drawLoaded();
     fromHash();
-    showSources();
+    load(species).catch(() => {});
   })();
   </script>
 </body>

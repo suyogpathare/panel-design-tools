@@ -2,5 +2,9 @@
 node_modules/
 .DS_Store
 .cache/
-# Built from vendor gene lists by scripts/build-panels.py; not redistributed here.
-public/data/panels-*.json
+# Built by scripts/build-genes.py from HGNC and MGI.
+public/data/genes-*.json
+# Built by scripts/build-ko-index.mjs (CC BY 4.0) and scripts/build-dyes.mjs (CC BY-SA 4.0).
+public/data/ko.json
+public/data/dyes.json
+__pycache__/
