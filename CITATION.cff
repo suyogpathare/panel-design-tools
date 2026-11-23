@@ -1,13 +1,13 @@
-cff-version: 1.2.0
-message: "If you use AbScout or PanelScout, please cite them as below."
-title: "AbScout and PanelScout: antibody and gene panel design tools for spatial biology"
+cff-version: 1.3.0
+message: "If you use AbScout, PanelScout or Methods Writer, please cite them as below."
+title: "AbScout, PanelScout and Methods Writer: panel design and methods reporting tools for spatial biology"
 type: software
 authors:
   - family-names: Pathare
     given-names: Suyog
     orcid: "https://orcid.org/0000-0001-8856-3796"
-version: 1.2.0
-date-released: 2026-11-18
+version: 1.3.0
+date-released: 2026-11-22
 license: MIT
 repository-code: "https://github.com/suyogpathare/panel-design-tools"
 doi: 10.5281/zenodo.24326636
@@ -20,7 +20,10 @@ abstract: >-
   Protein Atlas tissue RNA levels, and keeps a per-antibody validation
   record under the five IWGAV strategies. PanelScout reports how much of a gene list
   each imaging spatial transcriptomics panel covers, from panel files the user
-  loads from the vendors, resolving aliases through HGNC and MGI.
+  loads from the vendors, resolving aliases through HGNC and MGI. Methods Writer drafts the
+  methods section and a channel-level metadata table for a multiplex tissue
+  imaging study, following the MITI reporting guidelines, from what the user
+  enters.
 keywords:
   - spatial biology
   - spatial transcriptomics
@@ -28,3 +31,5 @@ keywords:
   - antibody validation
   - panel design
   - knockout validation
+  - MITI
+  - reporting guidelines
