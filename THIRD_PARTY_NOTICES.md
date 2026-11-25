@@ -2,8 +2,10 @@
 
 ## MITI (Minimum Information about Tissue Imaging)
 
-Methods Writer (`public/methods/index.html`) uses attribute names, value lists
-and significance levels from the MITI specification,
+Methods Writer (`public/methods/index.html`) and MITI Checker
+(`public/miti-check/index.html`, reading `public/data/miti.json`, which
+`scripts/build-miti.mjs` builds from the MITI YAML files) use attribute names,
+types, value lists and significance levels from the MITI specification,
 https://github.com/miti-consortium/MITI, described in Schapiro D, Yapp C,
 Sokolov A, et al. MITI minimum information guidelines for highly multiplexed
 tissue images. Nature Methods 2022;19:262–267. This project is not affiliated

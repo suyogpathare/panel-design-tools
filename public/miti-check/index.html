@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MITI Checker — Suyog Pathare</title>
+  <meta name="description" content="Check filled-in MITI metadata tables for multiplex tissue imaging: empty required fields, values outside MITI's lists, wrong types and channel-table problems. Runs in your browser.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .mc-head { padding-top: 64px; padding-bottom: 20px; }
+    .mc-head h1 { font-size: clamp(36px, 6vw, 56px); }
+    .mc-head p { color: var(--muted); margin: 14px 0 0; max-width: 42em; }
+    .mc-body { padding-top: 8px; padding-bottom: 96px; }
+    .panel { border: 1px solid var(--line); border-radius: 18px; padding: 18px 22px; margin-bottom: 20px; }
+    .panel > summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+    .panel > summary .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+    .note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+    .drop { margin-top: 14px; border: 1px dashed var(--line); border-radius: 14px; padding: 26px 18px; text-align: center; font-size: 14px; color: var(--muted); }
+    .drop.on { border-color: var(--pill); background: var(--band); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 14px; }
+    .linkbtn { border: 0; background: none; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+    .linkbtn:hover { text-decoration: underline; }
+    .load { cursor: pointer; }
+    select { font: inherit; font-size: 14px; color: var(--text); background: var(--band); border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px; }
+    .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 12px; font-size: 14px; }
+    .counts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .count { border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+    .count b { font-weight: 600; }
+    .count.err b { color: #c2410c; }
+    .count.ok b { color: #15803d; }
+    .h3 { font-size: 15px; margin: 22px 0 0; }
+    .find { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+    .find li { margin: 5px 0; }
+    .find .lvl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-right: 6px; }
+    .find .lvl.error { color: #c2410c; }
+    .find .lvl.warn { color: var(--link); }
+    .find .lvl.note { color: var(--muted); }
+    .find .rows { color: var(--muted); font-size: 13px; }
+    .cols { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .tpl { columns: 2 220px; margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+    .tpl li { margin: 3px 0; }
+    .credits { color: var(--muted); font-size: 12px; margin-top: 40px; line-height: 1.6; }
+    .credits.cite { margin-top: 12px; }
+    .flash { color: var(--muted); font-size: 13px; min-height: 18px; margin-top: 8px; }
+    @media (prefers-color-scheme: dark) {
+      .count.err b, .find .lvl.error { color: #fb923c; }
+      .count.ok b { color: #4ade80; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/">Suyog Pathare</a>
+      <nav aria-label="Sections">
+        <a href="/#tools">Tools</a>
+        <a href="/#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="mc-head">
+      <div class="wrap">
+        <h1>MITI Checker</h1>
+        <p>Check the metadata tables for a multiplex tissue imaging dataset before you submit them. Load a filled-in CSV or TSV and see which required fields are empty, which values are outside MITI's lists, and which values have the wrong type.</p>
+      </div>
+    </section>
+
+    <section class="mc-body">
+      <div class="wrap">
+        <details class="panel" open>
+          <summary>Check files</summary>
+          <p class="note">One table per file, with a header row. The checker guesses which MITI table each file is from its column names; change it if the guess is wrong. Row numbers count the header as row 1, as in a spreadsheet. Files are read in this browser and nothing is sent anywhere.</p>
+          <div class="drop" id="drop">Drop CSV or TSV files here, or
+            <label class="linkbtn load">choose files<input type="file" id="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" multiple hidden></label>
+          </div>
+          <div class="actions">
+            <button class="linkbtn" type="button" id="from-mw">Check the channel table from Methods Writer</button>
+            <button class="linkbtn" type="button" id="report" hidden>Download report</button>
+            <button class="linkbtn" type="button" id="clear" hidden>Clear</button>
+          </div>
+          <p class="flash" id="flash" aria-live="polite"></p>
+        </details>
+
+        <div id="results"></div>
+
+        <details class="panel">
+          <summary>Blank templates</summary>
+          <p class="note">A CSV with every MITI column for one table, in MITI's order. Required columns come first.</p>
+          <ul class="tpl" id="tpl"></ul>
+        </details>
+
+        <details class="panel">
+          <summary>What is checked</summary>
+          <ul class="find">
+            <li><b>Columns.</b> Every required column of the table is present. Column names are matched ignoring case, spaces and punctuation, so "catalog_number" will not match "Catalog #" but "catalog #" will.</li>
+            <li><b>Required values.</b> No required cell is empty. A cell reading "n/a" or "not applicable" is listed as a note, not an error. Conditional requirements in MITI (for example, PhysicalSizeZ when the image is a Z-stack) are applied row by row.</li>
+            <li><b>Allowed values.</b> Where MITI gives a list, each value is in it. A difference only in capitals is a warning; anything else is an error, with the closest listed value suggested.</li>
+            <li><b>Types.</b> Whole numbers, numbers, true/false, dates (YYYY-MM-DD) and RRIDs (RRID:AB_123456) have the right form, and numbers respect MITI's minimums.</li>
+            <li><b>Labels (channel table).</b> MITI lists the fluorophore, metal isotope and oligo barcode columns as required, but a channel carries one kind of label. Each channel needs one complete label: a fluorophore, or a metal element with its mass, or both barcode strands.</li>
+            <li><b>Nuclear stains (channel table).</b> Rows for DAPI, Hoechst, DRAQ5, SYTO and iridium intercalators are not antibodies, so antibody name, clone and RRID are not required for them.</li>
+            <li><b>Consistency (channel table).</b> Channel IDs and channel names are unique, and one RRID is not used for two different targets.</li>
+          </ul>
+          <p class="note">The checker does not open image files, so it cannot confirm that channel IDs and names match your OME-TIFF header. Check those against the file.</p>
+        </details>
+
+        <p class="credits">Attribute names, types, requirements and value lists come from the MITI reporting guidelines: Schapiro D, Yapp C, Sokolov A, et al. MITI minimum information guidelines for highly multiplexed tissue images. <i>Nature Methods</i> 2022;19:262–267. The specification is published at <a href="https://github.com/miti-consortium/MITI">github.com/miti-consortium/MITI</a> under the MIT License, © 2021 Laboratory of Systems Pharmacology @ Harvard; this page uses it as of <span id="ver">its current version</span>. The label and nuclear-stain rules above are this tool's reading of the guidelines, not part of them. This tool is independent and not endorsed by the MITI consortium.</p>
+        <p class="credits cite"><b>How to cite:</b> Pathare S. MITI Checker: checks metadata tables for multiplex tissue imaging against the MITI guidelines. Version 1.4, 2026. https://suyogpathare.com/miti-check/ <a href="https://doi.org/10.5281/zenodo.24326636">doi:10.5281/zenodo.24326636</a><br>Scientific design and validation by Suyog Pathare.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© <span id="yr"></span> Suyog Pathare</div>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    $("yr").textContent = new Date().getFullYear();
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    function flash(msg) { $("flash").textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => { $("flash").textContent = ""; }, 6000); }
+
+    const MAX_BYTES = 20e6, MAX_ROWS = 50000;
+    let MITI = null;            // { tables: [{ id, title, attrs: [...] }] }
+    const FILES = [];           // { name, header, rows, table }
+
+    // Column names are compared without case, spaces or punctuation.
+    const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const blank = (x) => !String(x ?? "").trim();
+    const isNA = (x) => /^(n\/?a|na|none|not applicable)$/i.test(String(x ?? "").trim());
+    const NUCLEAR = /^(dapi|hoechst|draq5|draq7|syto|sytox|propidium|ir\s?\d*\s*intercalator|intercalator|nuclear stain)/i;
+
+    // ---------- CSV / TSV ----------
+    function parseDelimited(text) {
+      text = text.replace(/^﻿/, "");
+      const first = text.slice(0, text.search(/\r?\n|$/));
+      const d = [["\t", (first.match(/\t/g) || []).length], [",", (first.match(/,/g) || []).length], [";", (first.match(/;/g) || []).length]]
+        .sort((a, b) => b[1] - a[1])[0][0];
+      const rows = []; let row = [], cell = "", q = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) {
+          if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+          else cell += c;
+        } else if (c === '"' && cell === "") q = true;
+        else if (c === d) { row.push(cell); cell = ""; }
+        else if (c === "\n" || c === "\r") {
+          if (c === "\r" && text[i + 1] === "\n") i++;
+          row.push(cell); cell = ""; rows.push(row); row = [];
+          if (rows.length > MAX_ROWS + 1) break;
+        } else cell += c;
+      }
+      if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+      return rows.filter((r) => r.some((x) => String(x).trim()));
+    }
+
+    // ---------- Schema helpers ----------
+    const tableById = (id) => MITI.tables.find((t) => t.id === id);
+    function guessTable(header) {
+      const h = new Set(header.map(norm));
+      let best = null, bestScore = 0;
+      for (const t of MITI.tables) {
+        const hit = t.attrs.filter((a) => h.has(norm(a.name))).length;
+        const score = hit / Math.max(4, Math.min(t.attrs.length, header.length));
+        if (hit && score > bestScore) { best = t.id; bestScore = score; }
+      }
+      return best || "04-channel";
+    }
+    function lev(a, b) {
+      if (Math.abs(a.length - b.length) > 6) return 99;
+      const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+      for (let j = 1; j <= b.length; j++) m[0][j] = j;
+      for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+        m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      return m[a.length][b.length];
+    }
+    function closest(v, list) {
+      const x = v.toLowerCase(); let best = "", d = 99;
+      for (const o of list) {
+        const y = o.toLowerCase();
+        const k = y.includes(x) || x.includes(y) ? Math.abs(y.length - x.length) / 2 : lev(x, y);
+        if (k < d) { d = k; best = o; }
+      }
+      return d <= Math.max(2, x.length / 3) ? best : "";
+    }
+    const BOOL = /^(true|false|yes|no|t|f|y|n|1|0)$/i;
+    const asBool = (x) => /^(true|yes|t|y|1)$/i.test(String(x).trim());
+
+    // MITI conditions look like: SizeZ > 1 · Data type == 'image' · Z_stack == True
+    function condition(when, get) {
+      const m = /^\s*(.+?)\s*(==|>|<|>=|<=|!=)\s*(.+?)\s*$/.exec(when || "");
+      if (!m) return true;
+      const left = get(m[1]); let right = m[3].replace(/^['"]|['"]$/g, "");
+      if (left == null || blank(left)) return false;
+      if (/^(true|false)$/i.test(right)) { const a = asBool(left), b = /^true$/i.test(right); return m[2] === "!=" ? a !== b : a === b; }
+      const ln = Number(left), rn = Number(right);
+      if (!isNaN(ln) && !isNaN(rn) && m[2] !== "==" && m[2] !== "!=") return { ">": ln > rn, "<": ln < rn, ">=": ln >= rn, "<=": ln <= rn }[m[2]];
+      const eq = String(left).trim().toLowerCase() === right.toLowerCase();
+      return m[2] === "!=" ? !eq : eq;
+    }
+
+    function typeProblem(a, v) {
+      v = String(v).trim();
+      switch (a.type) {
+        case "integer":
+          if (!/^[+-]?\d+(\.0+)?$/.test(v)) return ["error", "is not a whole number"];
+          if (a.min != null && Number(v) < a.min) return ["error", `is below MITI's minimum of ${a.min}`];
+          if (a.max != null && Number(v) > a.max) return ["error", `is above MITI's maximum of ${a.max}`];
+          return null;
+        case "float":
+          if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(v)) return ["error", "is not a number" + (/\d/.test(v) ? " (put units in their own column)" : "")];
+          if (a.min != null && Number(v) < a.min) return ["error", `is below MITI's minimum of ${a.min}`];
+          if (a.max != null && Number(v) > a.max) return ["error", `is above MITI's maximum of ${a.max}`];
+          return null;
+        case "boolean":
+          return BOOL.test(v) ? null : ["error", "is not true/false"];
+        case "date":
+          if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v))) return null;
+          return isNaN(Date.parse(v)) ? ["error", "is not a date"] : ["warn", "is a date but not in YYYY-MM-DD form"];
+        case "rrid":
+          if (/^RRID:\s?[A-Za-z]+_[A-Za-z0-9_:-]+$/.test(v)) return null;
+          if (/^[A-Za-z]+_[A-Za-z0-9_:-]+$/.test(v)) return ["warn", "is missing the RRID: prefix"];
+          return ["error", "is not an RRID (form: RRID:AB_123456)"];
+        case "doi":
+          // MITI also types free-text software fields as doi; only protocol fields are expected to hold identifiers.
+          if (!/protocol/i.test(a.name)) return null;
+          return v.split(/[;,|\s]+/).filter(Boolean).every((x) => /^(doi:)?10\.\d{4,9}\/\S+$/i.test(x) || /^https?:\/\//i.test(x))
+            ? null : ["note", "does not look like a DOI or link"];
+        case "filename":
+          return /[\\/]/.test(v) ? ["warn", "contains a folder path; MITI asks for the file name as submitted"] : null;
+        default: return null;
+      }
+    }
+
+    // ---------- Check one file ----------
+    function check(f) {
+      const t = tableById(f.table);
+      const idx = new Map(f.header.map((h, i) => [norm(h), i]));
+      const col = (name) => idx.get(norm(name));
+      const found = []; // { level, attr, msg, rows: [] , key }
+      const add = (level, attr, msg, row) => {
+        const key = `${level}|${attr}|${msg}`;
+        let g = found.find((x) => x.key === key);
+        if (!g) { g = { key, level, attr, msg, rows: [] }; found.push(g); }
+        if (Array.isArray(row)) g.rows.push(...row);
+        else if (row != null) g.rows.push(row);
+      };
+      const present = t.attrs.filter((a) => col(a.name) != null);
+      const missingReq = t.attrs.filter((a) => a.level === "required" && !a.when && col(a.name) == null);
+      const missingRec = t.attrs.filter((a) => a.level !== "required" && col(a.name) == null);
+      const known = new Set(t.attrs.map((a) => norm(a.name)));
+      const extra = f.header.filter((h) => h.trim() && !known.has(norm(h)));
+
+      const isChannel = t.id === "04-channel";
+      const LABEL = new Set(["fluorophore", "metalisotopeelement", "metalisotopemass", "oligobarcodeupperstrand", "oligobarcodelowerstrand"]);
+      const ANTIBODY_ONLY = new Set(["antibodyname", "clone", "rrididentifier"]);
+      const get = (r) => (name) => { const i = col(name); return i == null ? null : r[i]; };
+
+      for (const a of missingReq) {
+        if (isChannel && LABEL.has(norm(a.name))) continue; // judged per row below
+        add("error", a.name, "required column is missing");
+      }
+
+      f.rows.forEach((r, ri) => {
+        const rowNo = ri + 2; // spreadsheet row, counting the header
+        const g = get(r);
+        const nuclear = isChannel && NUCLEAR.test(String(g("Target name") || g("Channel Name") || g("Antibody Name") || "").trim());
+        for (const a of present) {
+          const v = r[col(a.name)] ?? "";
+          const k = norm(a.name);
+          let required = a.level === "required";
+          if (a.when) required = condition(a.when, g);
+          if (isChannel && LABEL.has(k)) required = false;
+          if (nuclear && ANTIBODY_ONLY.has(k)) required = false;
+          if (blank(v)) {
+            if (required) add("error", a.name, "required value is empty", rowNo);
+            continue;
+          }
+          if (isNA(v)) { if (required) add("note", a.name, "marked not applicable", rowNo); continue; }
+          if (a.values && a.values.length) {
+            const hit = a.values.find((o) => o === v.trim());
+            if (!hit) {
+              const ci = a.values.find((o) => o.toLowerCase() === v.trim().toLowerCase());
+              if (ci) add("warn", a.name, `"${v.trim()}" should be written "${ci}"`, rowNo);
+              else {
+                const c = closest(v.trim(), a.values);
+                add("error", a.name, `"${v.trim()}" is not in MITI's list${c ? ` (closest: "${c}")` : ""}`, rowNo);
+              }
+            }
+            continue;
+          }
+          const p = typeProblem(a, v);
+          if (p) add(p[0], a.name, `"${String(v).trim().slice(0, 60)}" ${p[1]}`, rowNo);
+        }
+        if (isChannel) {
+          const has = (n) => !blank(g(n)) && !isNA(g(n));
+          const fl = has("Fluorophore"), el = has("Metal isotope: Element"), ms = has("Metal isotope: Mass");
+          const up = has("Oligo barcode: upper strand"), lo = has("Oligo barcode:  lower strand");
+          const naLabel = ["Fluorophore", "Metal isotope: Element"].some((n) => isNA(g(n)));
+          if (el !== ms) add("error", el ? "Metal isotope: Mass" : "Metal isotope: Element", "metal isotope needs both element and mass", rowNo);
+          if (up !== lo) add("error", up ? "Oligo barcode:  lower strand" : "Oligo barcode: upper strand", "oligo barcode needs both strands", rowNo);
+          if (!fl && !(el && ms) && !(up && lo) && !nuclear && !naLabel) add("error", "Label", "no label: add a fluorophore, a metal element and mass, or both barcode strands", rowNo);
+        }
+      });
+
+      if (isChannel && f.rows.length) {
+        const dup = (name, label) => {
+          const i = col(name); if (i == null) return;
+          const seen = new Map();
+          f.rows.forEach((r, ri) => { const v = String(r[i] ?? "").trim(); if (!v) return; (seen.get(v) || seen.set(v, []).get(v)).push(ri + 2); });
+          for (const [v, rows] of seen) if (rows.length > 1) add("error", name, `${label} "${v}" appears more than once`, rows);
+        };
+        dup("Channel ID", "channel ID");
+        dup("Channel Name", "channel name");
+        const ir = col("RRID identifier"), it = col("Target name");
+        if (ir != null && it != null) {
+          const byR = new Map();
+          f.rows.forEach((r) => {
+            const k = String(r[ir] ?? "").trim().replace(/^RRID:\s?/i, "").toUpperCase(), tg = String(r[it] ?? "").trim();
+            if (!k || isNA(k) || !tg) return;
+            const m = byR.get(k) || byR.set(k, new Map()).get(k);
+            if (!m.has(tg.toLowerCase())) m.set(tg.toLowerCase(), tg);
+          });
+          for (const [k, m] of byR) if (m.size > 1) add("warn", "RRID identifier", `RRID:${k} is listed for different targets (${[...m.values()].join(", ")})`);
+        }
+      }
+
+      const order = { error: 0, warn: 1, note: 2 };
+      found.sort((a, b) => order[a.level] - order[b.level]);
+      const n = (lv) => found.filter((x) => x.level === lv).reduce((s, x) => s + Math.max(1, x.rows.length), 0);
+      return { t, present, missingReq, missingRec, extra, found, errors: n("error"), warns: n("warn"), notes: n("note") };
+    }
+
+    // ---------- Render ----------
+    const rowsText = (rows) => {
+      if (!rows.length) return "";
+      const u = [...new Set(rows)].sort((a, b) => a - b);
+      return u.length > 12 ? `rows ${u.slice(0, 12).join(", ")} and ${u.length - 12} more` : `row${u.length === 1 ? "" : "s"} ${u.join(", ")}`;
+    };
+    function draw() {
+      $("report").hidden = $("clear").hidden = !FILES.length;
+      $("results").innerHTML = FILES.map((f, fi) => {
+        const R = f.result = check(f);
+        const opts = MITI.tables.map((t) => `<option value="${t.id}"${t.id === f.table ? " selected" : ""}>${esc(t.id)} ${esc(t.title)}</option>`).join("");
+        const ok = !R.errors;
+        return `<details class="panel" open>
+          <summary>${esc(f.name)} <span class="sub">${f.rows.length} row${f.rows.length === 1 ? "" : "s"}</span></summary>
+          <div class="meta"><label>MITI table <select data-file="${fi}" aria-label="MITI table for ${esc(f.name)}">${opts}</select></label>
+            <button class="linkbtn" type="button" data-drop="${fi}">Remove</button></div>
+          <div class="counts">
+            <span class="count ${ok ? "ok" : "err"}"><b>${R.errors}</b> error${R.errors === 1 ? "" : "s"}</span>
+            <span class="count"><b>${R.warns}</b> warning${R.warns === 1 ? "" : "s"}</span>
+            <span class="count"><b>${R.notes}</b> note${R.notes === 1 ? "" : "s"}</span>
+            <span class="count"><b>${R.present.length}</b> of ${R.t.attrs.length} MITI columns present</span>
+          </div>
+          ${R.found.length ? `<h3 class="h3">Findings</h3><ul class="find">${R.found.map((x) =>
+            `<li><span class="lvl ${x.level}">${x.level === "warn" ? "warning" : x.level}</span><b>${esc(x.attr)}</b>: ${esc(x.msg)} <span class="rows">${esc(rowsText(x.rows))}</span></li>`).join("")}</ul>`
+            : `<p class="note">No problems found in the columns present.</p>`}
+          ${R.missingRec.length ? `<p class="cols"><b>Recommended columns not included:</b> ${esc(R.missingRec.map((a) => a.name).join(", "))}</p>` : ""}
+          ${R.extra.length ? `<p class="cols"><b>Columns not in this MITI table</b> (fine to keep, but check the spelling if they are meant to be MITI fields): ${esc(R.extra.join(", "))}</p>` : ""}
+        </details>`;
+      }).join("");
+    }
+    $("results").addEventListener("change", (e) => {
+      const i = e.target.dataset.file; if (i == null) return;
+      FILES[+i].table = e.target.value; draw();
+    });
+    $("results").addEventListener("click", (e) => {
+      const i = e.target.dataset.drop; if (i == null) return;
+      FILES.splice(+i, 1); draw();
+    });
+
+    // ---------- Loading ----------
+    async function ready() {
+      if (MITI) return true;
+      try {
+        const r = await fetch("/data/miti.json");
+        MITI = await r.json();
+        $("ver").textContent = `commit ${MITI.commit.slice(0, 7)}`;
+        drawTemplates();
+        return true;
+      } catch { flash("The MITI definitions could not be loaded. Reload the page and try again."); return false; }
+    }
+    function addTable(name, rows) {
+      if (rows.length < 2) { flash(`${name}: needs a header row and at least one data row.`); return; }
+      const header = rows[0].map((h) => String(h).trim());
+      const body = rows.slice(1, MAX_ROWS + 1);
+      if (rows.length - 1 > MAX_ROWS) flash(`${name}: only the first ${MAX_ROWS.toLocaleString()} rows were checked.`);
+      FILES.push({ name, header, rows: body, table: guessTable(header) });
+    }
+    async function loadFiles(list) {
+      if (!(await ready())) return;
+      for (const f of list) {
+        if (f.size > MAX_BYTES) { flash(`${f.name} is larger than 20 MB.`); continue; }
+        if (/\.(xlsx?|ods)$/i.test(f.name)) { flash(`${f.name}: save the sheet as CSV first.`); continue; }
+        addTable(f.name, parseDelimited(await f.text()));
+      }
+      draw();
+    }
+    $("file").addEventListener("change", (e) => { loadFiles([...e.target.files]); e.target.value = ""; });
+    const drop = $("drop");
+    ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("on"); }));
+    ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("on"); }));
+    drop.addEventListener("drop", (e) => loadFiles([...e.dataTransfer.files]));
+
+    // Methods Writer runs on the same site, so its saved channel table is readable here.
+    $("from-mw").addEventListener("click", async () => {
+      if (!(await ready())) return;
+      let S = {};
+      try { S = JSON.parse(localStorage.getItem("methods-writer-v1") || "{}"); } catch {}
+      const ab = (Array.isArray(S.abs) ? S.abs : []).filter((r) => r && Object.values(r).some((x) => String(x ?? "").trim()));
+      if (!ab.length) { flash("No Methods Writer channel table is saved in this browser."); return; }
+      const metal = (l) => /^(\d{2,3})\s*([A-Z][a-z]?)$|^([A-Z][a-z]?)\s*-?\s*(\d{2,3})$/.exec(String(l || "").trim());
+      const head = ["Channel ID", "Channel Name", "Cycle Number", "Target name", "Antibody Name", "RRID identifier", "Fluorophore",
+        "Metal isotope: Element", "Metal isotope: Mass", "Clone", "Lot", "Vendor", "Catalog #", "Dilution", "Passed QC", "QC details"];
+      const rows = ab.map((r, i) => {
+        const m = metal(r.label);
+        const rr = String(r.rrid || "").trim();
+        return [`Channel:0:${i}`, r.chan || r.target, r.cycle, r.target, r.name, rr ? (/^rrid:/i.test(rr) ? rr : "RRID:" + rr) : "", m ? "" : r.label,
+          m ? (m[2] || m[3]) : "", m ? (m[1] || m[4]) : "", r.clone, r.lot, r.vendor, r.cat, r.dil,
+          /^y/i.test(r.qc || "") ? "TRUE" : /^n/i.test(r.qc || "") ? "FALSE" : "", r.qcn].map((x) => String(x ?? ""));
+      });
+      FILES.push({ name: "Methods Writer channel table", header: head, rows, table: "04-channel" });
+      draw();
+    });
+
+    $("clear").addEventListener("click", () => { FILES.length = 0; draw(); });
+
+    // ---------- Report and templates ----------
+    function download(name, type, body) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([body], { type }));
+      a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    $("report").addEventListener("click", () => {
+      const L = [`MITI Checker report, ${new Date().toISOString().slice(0, 10)}`, `MITI version: ${MITI.source}`, ""];
+      for (const f of FILES) {
+        const R = f.result;
+        L.push(`${f.name}  (table ${R.t.id}, ${f.rows.length} rows)`);
+        L.push(`  ${R.errors} errors, ${R.warns} warnings, ${R.notes} notes; ${R.present.length} of ${R.t.attrs.length} MITI columns present`);
+        for (const x of R.found) L.push(`  ${x.level.toUpperCase()}  ${x.attr}: ${x.msg}${x.rows.length ? `  [${rowsText(x.rows)}]` : ""}`);
+        if (R.missingRec.length) L.push(`  Recommended columns not included: ${R.missingRec.map((a) => a.name).join(", ")}`);
+        if (R.extra.length) L.push(`  Columns not in this MITI table: ${R.extra.join(", ")}`);
+        L.push("");
+      }
+      L.push("Generated with MITI Checker (suyogpathare.com/miti-check/). Checks follow the MITI guidelines (Schapiro et al., Nature Methods 2022).");
+      download("miti-check-report.txt", "text/plain", L.join("\n") + "\n");
+    });
+    const csvCell = (x) => { x = String(x ?? ""); return /[",\n\r]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+    function drawTemplates() {
+      $("tpl").innerHTML = MITI.tables.map((t) =>
+        `<li><button class="linkbtn" type="button" data-tpl="${t.id}">${esc(t.id)} ${esc(t.title)}</button> <span class="rows">${t.attrs.length} columns</span></li>`).join("");
+    }
+    $("tpl").addEventListener("click", (e) => {
+      const id = e.target.dataset.tpl; if (!id) return;
+      const t = tableById(id);
+      const cols = [...t.attrs.filter((a) => a.level === "required" && !a.when), ...t.attrs.filter((a) => !(a.level === "required" && !a.when))];
+      download(`miti-${id}-template.csv`, "text/csv", cols.map((a) => csvCell(a.name)).join(",") + "\r\n");
+    });
+
+    ready();
+  </script>
+</body>
+</html>

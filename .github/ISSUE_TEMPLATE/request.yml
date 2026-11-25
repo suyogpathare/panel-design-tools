@@ -1,0 +1,29 @@
+name: Request a feature, panel or platform
+description: Suggest a platform, panel, data source or check the tools should support.
+title: "[Request] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - AbScout
+        - PanelScout
+        - Methods Writer
+        - MITI Checker
+        - A new tool
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you'd like
+      description: For a platform or panel, say where its public panel file or specification is published.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: How you would use it
+      description: Optional. The experiment or step this would help with.

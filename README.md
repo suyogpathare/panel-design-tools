@@ -1,4 +1,4 @@
-# Panel design tools: AbScout, PanelScout and Methods Writer
+# Panel design tools: AbScout, PanelScout, Methods Writer and MITI Checker
 
 [![DOI](https://zenodo.org/badge/1462079432.svg)](https://doi.org/10.5281/zenodo.24326636)
 
@@ -36,6 +36,19 @@ Scientific design and validation by Suyog Pathare.
   MITI channel-level metadata CSV and a JSON record. It lists the MITI fields
   still empty; the text is built only from what the user enters, and nothing
   leaves the browser.
+- **[MITI Checker](https://suyogpathare.com/miti-check/)**: check filled-in
+  MITI metadata tables (CSV or TSV) before submitting a dataset. It guesses
+  which of the eight MITI tables a file is, then lists missing required
+  columns, empty required values (applying MITI's conditional requirements row
+  by row), values outside MITI's value lists with the closest listed value,
+  and wrong types (whole numbers, numbers, true/false, dates, RRIDs). For the
+  channel table it requires one complete label per channel (fluorophore, metal
+  element and mass, or both barcode strands) rather than all label columns,
+  exempts nuclear stains from antibody-only fields, and flags duplicate
+  channel IDs and names and one RRID used for different targets. It also
+  checks the channel table saved in Methods Writer, offers blank templates for
+  each table, and downloads a text report. Files are read in the browser and
+  nothing is uploaded.
 
 Not affiliated with or endorsed by any vendor or database named here.
 
@@ -49,13 +62,13 @@ Not affiliated with or endorsed by any vendor or database named here.
 | [YCharOS](https://ycharos.com) via [Only Good Antibodies](https://onlygoodantibodies.co.uk) | knockout results (`public/data/ko.json`, built) | CC BY 4.0 |
 | [FPbase](https://www.fpbase.org) | dye spectra (`public/data/dyes.json`, built) | CC BY-SA 4.0 |
 | [HGNC](https://www.genenames.org), [MGI](https://www.informatics.jax.org) | gene symbols and aliases (`public/data/genes-*.json`, built) | see sites |
-| [MITI](https://github.com/miti-consortium/MITI) | field definitions and value lists (Methods Writer) | MIT; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
+| [MITI](https://github.com/miti-consortium/MITI) | field definitions and value lists (Methods Writer; `public/data/miti.json`, built, for MITI Checker) | MIT; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 | Vendor panel files | PanelScout | loaded by each user from the vendor; never hosted or redistributed here |
 
 ## Layout
 
 - `public/abscout/index.html`, `public/panelscout/index.html`,
-  `public/methods/index.html`: the tools
+  `public/methods/index.html`, `public/miti-check/index.html`: the tools
   (plain HTML and JavaScript, no build step).
 - `src/worker.js`: Cloudflare Worker serving `public/` plus the API AbScout
   uses: `/api/antibodies?q=...[&vendor=...][&species=Human|Mouse|Rat]`,
@@ -65,6 +78,8 @@ Not affiliated with or endorsed by any vendor or database named here.
   (HGNC and MGI symbols and aliases).
 - `scripts/build-omap-index.mjs`, `scripts/build-ko-index.mjs`,
   `scripts/build-dyes.mjs`: build `omap.json`, `ko.json` and `dyes.json`.
+- `scripts/build-miti.mjs`: builds `miti.json` from the MITI YAML files at a
+  pinned commit (needs `npm install --no-save js-yaml`).
 
 ## Run locally
 
@@ -73,6 +88,7 @@ python3 scripts/build-genes.py
 node scripts/build-ko-index.mjs
 node scripts/build-dyes.mjs
 node scripts/build-omap-index.mjs   # optional; omap.json is included
+node scripts/build-miti.mjs         # optional; miti.json is included
 npx wrangler dev
 ```
 

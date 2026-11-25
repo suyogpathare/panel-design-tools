@@ -1,13 +1,13 @@
 cff-version: 1.3.0
-message: "If you use AbScout, PanelScout or Methods Writer, please cite them as below."
-title: "AbScout, PanelScout and Methods Writer: panel design and methods reporting tools for spatial biology"
+message: "If you use AbScout, PanelScout, Methods Writer or MITI Checker, please cite them as below."
+title: "AbScout, PanelScout, Methods Writer and MITI Checker: panel design and methods reporting tools for spatial biology"
 type: software
 authors:
   - family-names: Pathare
     given-names: Suyog
     orcid: "https://orcid.org/0000-0001-8856-3796"
-version: 1.3.0
-date-released: 2026-11-22
+version: 1.4.0
+date-released: 2026-11-24
 license: MIT
 repository-code: "https://github.com/suyogpathare/panel-design-tools"
 doi: 10.5281/zenodo.24326636
@@ -23,7 +23,9 @@ abstract: >-
   loads from the vendors, resolving aliases through HGNC and MGI. Methods Writer drafts the
   methods section and a channel-level metadata table for a multiplex tissue
   imaging study, following the MITI reporting guidelines, from what the user
-  enters.
+  enters. MITI Checker checks filled-in MITI metadata tables for empty required
+  fields, values outside the MITI value lists, wrong types and channel-table
+  inconsistencies, in the browser.
 keywords:
   - spatial biology
   - spatial transcriptomics
@@ -33,3 +35,4 @@ keywords:
   - knockout validation
   - MITI
   - reporting guidelines
+  - metadata validation
